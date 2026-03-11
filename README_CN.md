@@ -1,9 +1,9 @@
 # JsxposedX
 
-英文文档：[`README_EN.md`](README_EN.md)
-入口页：[`README.md`](README.md)
+- 英文文档：[`README_EN.md`](README_EN.md)
+- 默认 README：[`README.md`](README.md)
 
-JsxposedX 是一个面向 Xposed/LSPosed 和 Frida 工作流的 Flutter Android 应用。它把 Flutter UI 层和 Android 侧的 Xposed Hook、LSPosed service 集成、原生 bridge 模块、设备侧安装调试脚本放在同一个仓库里。
+JsxposedX 是一个面向 Xposed/LSPosed 和 Frida 工作流的 Flutter Android 应用。它把 Flutter UI 层、Android 侧的 Xposed Hook、LSPosed service 集成、原生 bridge 模块、共享 IDE 运行配置，以及 PowerShell 安装调试脚本放在同一个仓库里。
 
 ## 项目概览
 
@@ -66,12 +66,21 @@ JsxposedX 是一个面向 Xposed/LSPosed 和 Frida 工作流的 Flutter Android 
 - `android/app/src/main/kotlin/com/jsxposed/x/`：Android 应用代码、Xposed Hook、原生 bridge 实现
 - `android/app/src/main/assets/xposed_init`：Xposed 入口列表
 - `android/app/src/main/resources/META-INF/xposed/module.prop`：Xposed 模块属性
-- `bin/`：安装/调试 PowerShell 脚本
+- `.buildScript/`：代码生成与 Debug 安装的共享 PowerShell 脚本
 - `.idea/runConfigurations/`：共享 IDE 运行配置
+
+## 共享 IDE 运行配置
+
+这个仓库提交了 `.idea/runConfigurations/`。
+
+拉取仓库后，JetBrains IDE 可以加载这些共享运行配置：
+
+- `watch_pigeons` -> 执行 `.buildScript/pigen_watch.ps1`
+- `build_for_xposed_type` -> 执行 `.buildScript/run_install_debug.ps1 -SkipAttach`
 
 ## Pigeon 代码生成
 
-`pigen-watch.ps1` 会监听 `lib/pigeons/**/*.dart`，并且：
+`.buildScript/pigen_watch.ps1` 会监听 `lib/pigeons/**/*.dart`，并且：
 
 - 生成 Dart bridge 文件到 `lib/generated`
 - 生成 Kotlin bridge 文件到 `android/app/src/main/kotlin/...`
@@ -80,12 +89,12 @@ JsxposedX 是一个面向 Xposed/LSPosed 和 Frida 工作流的 Flutter Android 
 在仓库根目录运行：
 
 ```powershell
-.\pigen-watch.ps1
+.\.buildScript\pigen_watch.ps1
 ```
 
 ## Debug 安装脚本
 
-`bin/run-installDebug.ps1` 是当前仓库里的 Debug 安装脚本。
+`.buildScript/run_install_debug.ps1` 是当前仓库里的 Debug 安装脚本。
 
 它会：
 
@@ -98,26 +107,18 @@ JsxposedX 是一个面向 Xposed/LSPosed 和 Frida 工作流的 Flutter Android 
 在仓库根目录运行：
 
 ```powershell
-.\bin\run-installDebug.ps1
+.\.buildScript\run_install_debug.ps1
 ```
 
 常用参数：
 
 ```powershell
-.\bin\run-installDebug.ps1 -SkipAttach
-.\bin\run-installDebug.ps1 -SkipLaunch
-.\bin\run-installDebug.ps1 -DeviceId <serial>
+.\.buildScript\run_install_debug.ps1 -SkipAttach
+.\.buildScript\run_install_debug.ps1 -SkipLaunch
+.\.buildScript\run_install_debug.ps1 -DeviceId <serial>
 ```
 
-## 共享 IDE 运行配置
-
-这个仓库提交了 `.idea/runConfigurations/Flutter_installDebug.xml`。
-
-拉取仓库后，JetBrains IDE 可以加载这个共享运行配置：
-
-- `Flutter installDebug`
-
-这个配置执行的是 `bin/run-installDebug.ps1 -SkipAttach`。
+这个脚本用于 Xposed/LSPosed 的 Debug 安装流程，不是普通 Flutter hot reload 的替代品。
 
 ## 常规构建
 
@@ -128,14 +129,22 @@ flutter build apk --debug
 flutter build apk --release
 ```
 
-`bin/run-installDebug.ps1` 负责设备侧的安装、启动和 attach 流程。
+`.buildScript/run_install_debug.ps1` 负责设备侧的安装、启动和 attach 流程。
+
+## Release 签名
+
+Release 签名通过本地 `android/key.properties` 加载。
+
+- `android/key.properties` 不在仓库中
+- keystore 文件不在仓库中
+- 签名信息只保留在本地文件中
 
 ## 常见开发流程
 
 ```powershell
 flutter pub get
-.\pigen-watch.ps1
-.\bin\run-installDebug.ps1
+.\.buildScript\pigen_watch.ps1
+.\.buildScript\run_install_debug.ps1
 flutter attach
 ```
 

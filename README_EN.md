@@ -1,9 +1,8 @@
 # JsxposedX
 
-Chinese documentation: [`README_CN.md`](README_CN.md)
-Landing page: [`README.md`](README.md)
-
-JsxposedX is a Flutter Android application for Xposed/LSPosed and Frida workflows. It combines a Flutter UI layer with Android-side Xposed hooks, LSPosed service integration, native bridge modules, and device-side install/debug scripts.
+- Default README: [`README.md`](README.md)
+- Chinese documentation: [`README_CN.md`](README_CN.md)
+JsxposedX is a Flutter Android application for Xposed/LSPosed and Frida workflows. It combines a Flutter UI layer with Android-side Xposed hooks, LSPosed service integration, native bridge modules, shared IDE run configurations, and PowerShell-based install/debug scripts.
 
 ## Project Overview
 
@@ -66,12 +65,21 @@ Because of that, installation and verification involve the Android/Xposed side a
 - `android/app/src/main/kotlin/com/jsxposed/x/`: Android app code, Xposed hooks, and native bridge implementations
 - `android/app/src/main/assets/xposed_init`: Xposed entry list
 - `android/app/src/main/resources/META-INF/xposed/module.prop`: Xposed module properties
-- `bin/`: install/debug PowerShell scripts
+- `.buildScript/`: shared PowerShell scripts for code generation and debug install
 - `.idea/runConfigurations/`: shared IDE run configurations
+
+## Shared IDE Run Configurations
+
+This repository commits `.idea/runConfigurations/`.
+
+After cloning, JetBrains IDEs can load these shared run configurations:
+
+- `watch_pigeons` -> runs `.buildScript/pigen_watch.ps1`
+- `build_for_xposed_type` -> runs `.buildScript/run_install_debug.ps1 -SkipAttach`
 
 ## Pigeon Code Generation
 
-`pigen-watch.ps1` watches `lib/pigeons/**/*.dart` and:
+`.buildScript/pigen_watch.ps1` watches `lib/pigeons/**/*.dart` and:
 
 - generates Dart bridge files into `lib/generated`
 - generates Kotlin bridge files under `android/app/src/main/kotlin/...`
@@ -80,12 +88,12 @@ Because of that, installation and verification involve the Android/Xposed side a
 Run it from the repository root:
 
 ```powershell
-.\pigen-watch.ps1
+.\.buildScript\pigen_watch.ps1
 ```
 
 ## Debug Install Script
 
-`bin/run-installDebug.ps1` is the debug install script in this repository.
+`.buildScript/run_install_debug.ps1` is the debug install script in this repository.
 
 It:
 
@@ -98,26 +106,18 @@ It:
 Run it from the repository root:
 
 ```powershell
-.\bin\run-installDebug.ps1
+.\.buildScript\run_install_debug.ps1
 ```
 
 Useful switches:
 
 ```powershell
-.\bin\run-installDebug.ps1 -SkipAttach
-.\bin\run-installDebug.ps1 -SkipLaunch
-.\bin\run-installDebug.ps1 -DeviceId <serial>
+.\.buildScript\run_install_debug.ps1 -SkipAttach
+.\.buildScript\run_install_debug.ps1 -SkipLaunch
+.\.buildScript\run_install_debug.ps1 -DeviceId <serial>
 ```
 
-## Shared IDE Run Configuration
-
-This repository commits `.idea/runConfigurations/Flutter_installDebug.xml`.
-
-After cloning, JetBrains IDEs can load the shared run configuration:
-
-- `Flutter installDebug`
-
-This configuration runs `bin/run-installDebug.ps1 -SkipAttach`.
+This script is used for the Xposed/LSPosed debug install flow. It is not a replacement for normal Flutter hot reload.
 
 ## Standard Build
 
@@ -128,14 +128,22 @@ flutter build apk --debug
 flutter build apk --release
 ```
 
-`bin/run-installDebug.ps1` handles the install, launch, and attach flow for device-side verification.
+`.buildScript/run_install_debug.ps1` handles the install, launch, and attach flow for device-side verification.
+
+## Release Signing
+
+Release signing is loaded from local `android/key.properties`.
+
+- `android/key.properties` is not committed
+- the keystore file is not committed
+- keep signing data in local files only
 
 ## Typical Development Flow
 
 ```powershell
 flutter pub get
-.\pigen-watch.ps1
-.\bin\run-installDebug.ps1
+.\.buildScript\pigen_watch.ps1
+.\.buildScript\run_install_debug.ps1
 flutter attach
 ```
 
