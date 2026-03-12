@@ -2,7 +2,9 @@ package com.jsxposed.x.feature.jsxposed.loader
 
 import android.content.Context
 import com.jsxposed.x.core.bridge.xposed_js_snapshot.XposedScriptSnapshotRepository
+import com.jsxposed.x.core.utils.shell.PiniaRoot
 import com.jsxposed.x.core.utils.log.LogX
+import com.jsxposed.x.feature.jsxposed.bridge.JxBridgeManager
 import com.whl.quickjs.wrapper.QuickJSContext
 import org.json.JSONObject
 
@@ -13,9 +15,11 @@ import org.json.JSONObject
 class ScriptLoader(
     private val context: Context,
     private val qjs: QuickJSContext,
-    private val packageName: String
+    private val packageName: String,
+    private val bridgeManager: JxBridgeManager,
 ) {
     private val TAG = "FINDBUGS"
+    private val piniaRoot = PiniaRoot()
 
     fun loadAndExecute() {
         val loadStart = System.currentTimeMillis()
@@ -35,23 +39,41 @@ class ScriptLoader(
             val count = scripts?.length() ?: 0
             LogX.d(TAG, "snapshot-parse-finish package=$packageName file=$fileName count=$count")
             if (count == 0) {
-                LogX.d(TAG, "snapshot-empty package=$packageName file=$fileName reason=no-enabled-scripts")
+                LogX.d(TAG, "snapshot-empty package=$packageName file=$fileName reason=no-snapshot-scripts")
                 return
             }
 
             for (index in 0 until count) {
                 val item = scripts?.optJSONObject(index) ?: continue
                 val scriptName = item.optString("name")
+                val localPath = item.optString("localPath")
                 val sourceCode = item.optString("code")
-                if (scriptName.isBlank() || sourceCode.isEmpty()) {
+                if (scriptName.isBlank() || localPath.isBlank() || sourceCode.isEmpty()) {
                     LogX.e(TAG, "snapshot-entry-invalid package=$packageName file=$fileName index=$index")
                     continue
                 }
 
-                LogX.d(TAG, "ScriptLoader.execute-start package=$packageName script=$scriptName size=${sourceCode.length}")
+                val switchKey = XposedScriptSnapshotRepository.scriptSwitchKey(packageName, localPath)
+                val enabled = piniaRoot.getBoolean(switchKey, false)
+                LogX.d(TAG, "script-status-check package=$packageName script=$scriptName enabled=$enabled key=$switchKey")
+                if (!enabled) {
+                    val removed = bridgeManager.unhookScript(localPath)
+                    LogX.d(TAG, "script-skip-disabled package=$packageName script=$scriptName autoUnhook=$removed")
+                    LogX.d(TAG, "script-skip-disabled package=$packageName script=$scriptName")
+                    continue
+                }
+
+                val removed = bridgeManager.unhookScript(localPath)
+                LogX.d(TAG, "script-reload-cleanup package=$packageName script=$scriptName removed=$removed")
+                LogX.d(TAG, "script-execute-start package=$packageName script=$scriptName size=${sourceCode.length}")
                 val executeStart = System.currentTimeMillis()
-                executeScript(scriptName, sourceCode)
-                LogX.d(TAG, "ScriptLoader.execute-finish package=$packageName script=$scriptName cost=${System.currentTimeMillis() - executeStart}ms")
+                bridgeManager.beginScriptScope(localPath)
+                try {
+                    executeScript(scriptName, sourceCode)
+                } finally {
+                    bridgeManager.endScriptScope()
+                }
+                LogX.d(TAG, "script-execute-finish package=$packageName script=$scriptName cost=${System.currentTimeMillis() - executeStart}ms")
             }
 
             LogX.d(TAG, "ScriptLoader.loadAndExecute finish package=$packageName cost=${System.currentTimeMillis() - loadStart}ms")

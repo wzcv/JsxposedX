@@ -24,6 +24,58 @@ class JxHookBridge(
     private val TAG = "JxHookBridge"
     private val hookIdCounter = AtomicInteger(0)
     private val hookStore = ConcurrentHashMap<Int, XC_MethodHook.Unhook>()
+    private val hookOwnerStore = ConcurrentHashMap<Int, String>()
+    private val scriptHookIds = ConcurrentHashMap<String, MutableSet<Int>>()
+
+    @Volatile
+    private var currentScriptKey: String? = null
+
+    fun beginScriptScope(scriptKey: String) {
+        currentScriptKey = scriptKey
+        LogX.d(TAG, "script-scope-begin script=$scriptKey")
+    }
+
+    fun endScriptScope() {
+        currentScriptKey = null
+    }
+
+    fun unhookScript(scriptKey: String): Int {
+        val ids = scriptHookIds.remove(scriptKey)?.toList() ?: emptyList()
+        if (ids.isEmpty()) {
+            LogX.d(TAG, "script-unhook-skip script=$scriptKey reason=no-hooks")
+            return 0
+        }
+
+        var removed = 0
+        ids.forEach { id ->
+            val unhook = hookStore.remove(id) ?: return@forEach
+            hookOwnerStore.remove(id)
+            try {
+                unhook.unhook()
+                removed++
+            } catch (e: Throwable) {
+                LogX.e(TAG, "script-unhook-failed script=$scriptKey id=$id error=${e.message}")
+            }
+        }
+        LogX.d(TAG, "script-unhook-finish script=$scriptKey removed=$removed")
+        return removed
+    }
+
+    private fun registerHookOwner(id: Int) {
+        val scriptKey = currentScriptKey ?: return
+        hookOwnerStore[id] = scriptKey
+        scriptHookIds.computeIfAbsent(scriptKey) { ConcurrentHashMap.newKeySet<Int>() }.add(id)
+    }
+
+    private fun forgetHookOwner(id: Int) {
+        val scriptKey = hookOwnerStore.remove(id) ?: return
+        scriptHookIds[scriptKey]?.let { ids ->
+            ids.remove(id)
+            if (ids.isEmpty()) {
+                scriptHookIds.remove(scriptKey)
+            }
+        }
+    }
 
     fun hookMethod(className: String, methodName: String, paramTypesArray: JSArray?, callbacks: JSObject): Int {
         try {
@@ -40,6 +92,7 @@ class JxHookBridge(
             )
             val id = hookIdCounter.incrementAndGet()
             hookStore[id] = unhook
+            registerHookOwner(id)
             LogX.d(TAG, "成功注册 Hook[$id]: $className#$methodName")
             return id
         } catch (e: Throwable) {
@@ -63,6 +116,7 @@ class JxHookBridge(
             )
             val id = hookIdCounter.incrementAndGet()
             hookStore[id] = unhook
+            registerHookOwner(id)
             LogX.d(TAG, "成功注册 Constructor Hook[$id]: $className")
             return id
         } catch (e: Throwable) {
@@ -76,6 +130,7 @@ class JxHookBridge(
     fun unhook(args: Array<Any?>?): Boolean {
         val id = (args?.get(0) as? Number)?.toInt() ?: return false
         val unhook = hookStore.remove(id) ?: return false
+        forgetHookOwner(id)
         try {
             unhook.unhook()
             LogX.d(TAG, "已移除 Hook[$id]")
@@ -98,6 +153,7 @@ class JxHookBridge(
             for (u in unhooks) {
                 val id = hookIdCounter.incrementAndGet()
                 hookStore[id] = u
+                registerHookOwner(id)
                 ids.set(id, idx++)
             }
             LogX.d(TAG, "hookAllMethods: $className#$methodName -> ${unhooks.size} hooks")
@@ -119,6 +175,7 @@ class JxHookBridge(
             for (u in unhooks) {
                 val id = hookIdCounter.incrementAndGet()
                 hookStore[id] = u
+                registerHookOwner(id)
                 ids.set(id, idx++)
             }
             LogX.d(TAG, "hookAllConstructors: $className -> ${unhooks.size} hooks")

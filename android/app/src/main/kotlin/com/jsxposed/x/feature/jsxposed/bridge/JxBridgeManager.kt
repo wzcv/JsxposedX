@@ -19,6 +19,18 @@ class JxBridgeManager(
     private val methodBridge = JxMethodBridge(qjs, classLoader)
     private val logBridge = JxLogBridge(qjs)
 
+    fun beginScriptScope(scriptKey: String) {
+        hookBridge.beginScriptScope(scriptKey)
+    }
+
+    fun endScriptScope() {
+        hookBridge.endScriptScope()
+    }
+
+    fun unhookScript(scriptKey: String): Int {
+        return hookBridge.unhookScript(scriptKey)
+    }
+
     fun injectToJs() {
         val globalObj = qjs.globalObject
         

@@ -3,7 +3,6 @@ package com.jsxposed.x.core.bridge.xposed_js_snapshot
 import android.content.Context
 import android.os.ParcelFileDescriptor
 import com.jsxposed.x.core.bridge.lsposed_native.LSPosed
-import com.jsxposed.x.core.bridge.pinia_native.Pinia
 import com.jsxposed.x.core.bridge.project_native.Project
 import com.jsxposed.x.core.utils.log.LogX
 import org.json.JSONArray
@@ -30,10 +29,13 @@ class XposedScriptSnapshotRepository(private val context: Context) {
             if (markerIndex <= 0) return null
             return payload.substring(0, markerIndex)
         }
+
+        fun scriptSwitchKey(packageName: String, localPath: String): String {
+            return "${XPOSED_SWITCH_PREFIX}${packageName}_${localPath}"
+        }
     }
 
     private val project = Project(context)
-    private val pinia = Pinia(context)
 
     fun buildSnapshot(packageName: String): String {
         val scripts = JSONArray()
@@ -41,10 +43,6 @@ class XposedScriptSnapshotRepository(private val context: Context) {
 
         scriptPaths.forEach { path ->
             val scriptName = java.io.File(path).name
-            val switchKey = "${XPOSED_SWITCH_PREFIX}${packageName}_${path}"
-            val isEnabled = pinia.getValue(PINIA_SPACE, switchKey, false)
-            if (!isEnabled) return@forEach
-
             val sourceCode = project.readJsScript(packageName, scriptName)
             if (sourceCode.isEmpty() || sourceCode.startsWith("cat: ")) {
                 LogX.e(TAG, "buildSnapshot skip unreadable package=$packageName script=$scriptName")
@@ -53,6 +51,7 @@ class XposedScriptSnapshotRepository(private val context: Context) {
 
             val item = JSONObject()
             item.put("name", scriptName)
+            item.put("localPath", path)
             item.put("code", sourceCode)
             scripts.put(item)
         }

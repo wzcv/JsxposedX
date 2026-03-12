@@ -22,7 +22,8 @@ class Pinia(val context: Context) {
         if (type == TYPE_REMOTE) {
             val remote = LSPosed.getRemotePreferences(space)
             if (remote != null) return remote
-            LogX.w(TAG, "XposedService not connected, falling back to local for space=$space")
+            LogX.e(TAG, "XposedService not connected for remote prefs: space=$space")
+            throw IllegalStateException("XposedService not connected for remote prefs: $space")
         }
         return context.getSharedPreferences(space, Context.MODE_PRIVATE)
     }

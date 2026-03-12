@@ -66,7 +66,7 @@ object JsXposedManager {
                 qjs.evaluate(JsSugar.CODE, "jx_sugar.js")
                 trace(lpparam, "JsSugar.evaluate", sugarStart)
 
-                val loader = ScriptLoader(context, qjs, packageName)
+                val loader = ScriptLoader(context, qjs, packageName, bridgeManager)
                 val scriptLoadStart = System.currentTimeMillis()
                 loader.loadAndExecute()
                 trace(lpparam, "ScriptLoader.loadAndExecute", scriptLoadStart)
