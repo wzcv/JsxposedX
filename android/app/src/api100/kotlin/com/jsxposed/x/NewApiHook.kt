@@ -38,6 +38,8 @@ class NewApiHook(base: XposedInterface, param: XposedModuleInterface.ModuleLoade
     companion object {
         @Volatile
         var instance: NewApiHook? = null
+
+        fun usePreferencesSnapshotTransport(): Boolean = true
     }
 
     private fun createStartupParam(modulePath: String): IXposedHookZygoteInit.StartupParam {

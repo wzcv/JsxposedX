@@ -41,6 +41,8 @@ class NewApiHook : XposedModule() {
 
         @Volatile
         private var processName: String = ""
+
+        fun usePreferencesSnapshotTransport(): Boolean = false
     }
 
     private fun createStartupParam(modulePath: String): IXposedHookZygoteInit.StartupParam {

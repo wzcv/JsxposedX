@@ -1,6 +1,7 @@
 package com.jsxposed.x.feature.jsxposed.loader
 
 import android.content.Context
+import com.jsxposed.x.JsXposedTransportConfig
 import com.jsxposed.x.core.bridge.xposed_js_snapshot.XposedScriptSnapshotRepository
 import com.jsxposed.x.core.utils.shell.PiniaRoot
 import com.jsxposed.x.core.utils.log.LogX
@@ -26,8 +27,12 @@ class ScriptLoader(
         val fileName = XposedScriptSnapshotRepository.snapshotFileName(packageName)
 
         try {
-            LogX.d(TAG, "snapshot-open-start package=$packageName thread=${Thread.currentThread().name} file=$fileName")
-            val snapshotText = XposedRemoteFileReader.readText(fileName)
+            LogX.d(TAG, "snapshot-open-start package=$packageName thread=${Thread.currentThread().name} file=$fileName transport=${if (JsXposedTransportConfig.usePreferencesSnapshotTransport()) "pinia" else "remote-file"}")
+            val snapshotText = if (JsXposedTransportConfig.usePreferencesSnapshotTransport()) {
+                XposedScriptSnapshotRepository.readSnapshotFromPreferences(packageName, piniaRoot)
+            } else {
+                XposedRemoteFileReader.readText(fileName)
+            }
             if (snapshotText.isNullOrEmpty()) {
                 LogX.d(TAG, "snapshot-empty package=$packageName file=$fileName reason=file-missing-or-empty")
                 return

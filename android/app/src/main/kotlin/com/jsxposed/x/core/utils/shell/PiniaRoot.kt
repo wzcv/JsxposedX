@@ -27,8 +27,16 @@ class PiniaRoot(
     fun refresh() = getAll()
 
     inline fun <reified T> getValue(key: String, defaultValue: T): T {
-        val value = remotePrefs()?.all?.get(key) ?: return defaultValue
-        return if (value is T) value else defaultValue
+        val prefs = remotePrefs() ?: return defaultValue
+        @Suppress("UNCHECKED_CAST")
+        return when (T::class) {
+            String::class -> prefs.getString(key, defaultValue as String) as T
+            Int::class -> prefs.getInt(key, defaultValue as Int) as T
+            Boolean::class -> prefs.getBoolean(key, defaultValue as Boolean) as T
+            Long::class -> prefs.getLong(key, defaultValue as Long) as T
+            Float::class -> prefs.getFloat(key, defaultValue as Float) as T
+            else -> defaultValue
+        }
     }
 
     fun getString(key: String, defaultValue: String): String = getValue(key, defaultValue)

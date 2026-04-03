@@ -2,8 +2,10 @@ package com.jsxposed.x.core.bridge.xposed_js_snapshot
 
 import android.content.Context
 import android.os.ParcelFileDescriptor
+import com.jsxposed.x.JsXposedTransportConfig
 import com.jsxposed.x.core.bridge.lsposed_native.LSPosed
 import com.jsxposed.x.core.bridge.project_native.Project
+import com.jsxposed.x.core.utils.shell.PiniaRoot
 import com.jsxposed.x.core.utils.log.LogX
 import org.json.JSONArray
 import org.json.JSONObject
@@ -15,6 +17,8 @@ class XposedScriptSnapshotRepository(private val context: Context) {
         private const val SNAPSHOT_VERSION = 1
         private const val PINIA_SPACE = "pinia"
         private const val XPOSED_SWITCH_PREFIX = "xposed_check_status_"
+        private const val SNAPSHOT_PREF_PREFIX = "xposed_snapshot_"
+        private const val SNAPSHOT_CHUNK_SIZE = 16 * 1024
 
         fun snapshotFileName(packageName: String): String {
             val sanitizedPackage = packageName.replace('.', '_')
@@ -32,6 +36,35 @@ class XposedScriptSnapshotRepository(private val context: Context) {
 
         fun scriptSwitchKey(packageName: String, localPath: String): String {
             return "${XPOSED_SWITCH_PREFIX}${packageName}_${localPath}"
+        }
+
+        private fun snapshotPrefsBaseKey(packageName: String): String {
+            val sanitizedPackage = packageName.replace('.', '_')
+            return "${SNAPSHOT_PREF_PREFIX}${sanitizedPackage}"
+        }
+
+        private fun snapshotPrefsCountKey(packageName: String): String {
+            return "${snapshotPrefsBaseKey(packageName)}_count"
+        }
+
+        private fun snapshotPrefsChunkKey(packageName: String, index: Int): String {
+            return "${snapshotPrefsBaseKey(packageName)}_chunk_$index"
+        }
+
+        fun readSnapshotFromPreferences(packageName: String, piniaRoot: PiniaRoot): String? {
+            val count = piniaRoot.getInt(snapshotPrefsCountKey(packageName), 0)
+            if (count <= 0) return null
+
+            val builder = StringBuilder()
+            for (index in 0 until count) {
+                val chunk = piniaRoot.getString(snapshotPrefsChunkKey(packageName, index), "")
+                if (chunk.isEmpty()) {
+                    LogX.e(TAG, "readSnapshotFromPreferences missing chunk package=$packageName index=$index count=$count")
+                    return null
+                }
+                builder.append(chunk)
+            }
+            return builder.toString()
         }
     }
 
@@ -66,6 +99,10 @@ class XposedScriptSnapshotRepository(private val context: Context) {
 
     fun writeSnapshot(packageName: String) {
         val snapshot = buildSnapshot(packageName)
+        if (JsXposedTransportConfig.usePreferencesSnapshotTransport()) {
+            writeSnapshotToPreferences(packageName, snapshot)
+            return
+        }
         val fileName = snapshotFileName(packageName)
         val descriptor = LSPosed.openRemoteFile(fileName)
 
@@ -86,6 +123,37 @@ class XposedScriptSnapshotRepository(private val context: Context) {
             LogX.d(TAG, "writeSnapshot success package=$packageName file=$fileName size=${snapshot.length}")
         } catch (e: Exception) {
             LogX.e(TAG, "writeSnapshot failed package=$packageName file=$fileName error=${e.message}")
+        }
+    }
+
+    private fun writeSnapshotToPreferences(packageName: String, snapshot: String) {
+        val prefs = LSPosed.getRemotePreferences(PINIA_SPACE)
+        if (prefs == null) {
+            LogX.e(TAG, "writeSnapshotToPreferences failed package=$packageName reason=remote-prefs-unavailable")
+            return
+        }
+
+        try {
+            val previousCount = prefs.getInt(snapshotPrefsCountKey(packageName), 0)
+            val chunks = snapshot.chunked(SNAPSHOT_CHUNK_SIZE)
+            val editor = prefs.edit()
+            editor.putInt(snapshotPrefsCountKey(packageName), chunks.size)
+            chunks.forEachIndexed { index, chunk ->
+                editor.putString(snapshotPrefsChunkKey(packageName, index), chunk)
+            }
+            if (previousCount > chunks.size) {
+                for (index in chunks.size until previousCount) {
+                    editor.remove(snapshotPrefsChunkKey(packageName, index))
+                }
+            }
+            val committed = editor.commit()
+            if (!committed) {
+                LogX.e(TAG, "writeSnapshotToPreferences failed package=$packageName reason=commit-false")
+                return
+            }
+            LogX.d(TAG, "writeSnapshotToPreferences success package=$packageName chunks=${chunks.size} size=${snapshot.length}")
+        } catch (e: Exception) {
+            LogX.e(TAG, "writeSnapshotToPreferences failed package=$packageName error=${e.message}")
         }
     }
 
