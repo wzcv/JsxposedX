@@ -14,6 +14,11 @@ class AiConfigQueryDatasource {
 
   AiConfigQueryDatasource({required PiniaStorage storage}) : _storage = storage;
 
+  Future<AiConfigDto> getBuiltinConfig() async {
+    final builtinApiKey = await _storage.getString(_builtinApiKeyStorageKey);
+    return _builtinConfigDto(apiKey: builtinApiKey);
+  }
+
   /// 获取 AI 配置
   Future<AiConfigDto> getConfig() async {
     final configStr = await _storage.getString(_currentConfigStorageKey);
@@ -21,17 +26,11 @@ class AiConfigQueryDatasource {
       try {
         final config = AiConfigDto.fromJson(jsonDecode(configStr));
         if (config.id == builtinAiConfigId) {
-          final builtinApiKey = await _storage.getString(_builtinApiKeyStorageKey);
-          return AiConfigDto(
-            id: builtinAiConfigId,
-            name: builtinAiConfigName,
-            apiKey: builtinApiKey.isNotEmpty ? builtinApiKey : config.apiKey,
-            apiUrl: builtinAiConfigBaseUrl,
-            moduleName: 'gpt-5.4',
-            maxToken: 4096,
-            temperature: 1.0,
-            memoryRounds: 6,
-            apiType: 'openaiResponses',
+          final builtinConfig = await getBuiltinConfig();
+          return builtinConfig.copyWith(
+            apiKey: builtinConfig.apiKey.isNotEmpty
+                ? builtinConfig.apiKey
+                : config.apiKey,
           );
         }
         // 如果配置没有 id，生成一个默认的
@@ -47,21 +46,21 @@ class AiConfigQueryDatasource {
               name: config.name.isEmpty ? '迁移配置' : config.name,
             );
           }
-          return _builtinConfigDto();
+          return getBuiltinConfig();
         }
         return config;
       } catch (e) {
-        return _builtinConfigDto();
+        return getBuiltinConfig();
       }
     }
-    return _builtinConfigDto();
+    return getBuiltinConfig();
   }
 
-  AiConfigDto _builtinConfigDto() {
+  AiConfigDto _builtinConfigDto({String apiKey = ''}) {
     return AiConfigDto(
       id: builtinAiConfigId,
       name: builtinAiConfigName,
-      apiKey: '',
+      apiKey: apiKey,
       apiUrl: builtinAiConfigBaseUrl,
       moduleName: 'gpt-5.4',
       maxToken: 4096,
