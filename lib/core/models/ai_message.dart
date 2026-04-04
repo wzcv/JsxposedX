@@ -11,22 +11,30 @@ abstract class AiMessage with _$AiMessage {
     required String id,
     required String role, // system, user, assistant, tool
     required String content,
+    @Default(null) String? reasoningContent,
     @Default(false) bool isError,
     @Default(false) bool isThinking,
+
     /// Function Calling: assistant 消息中携带的工具调用列表
     @Default(null) List<Map<String, dynamic>>? toolCalls,
+
     /// Function Calling: tool 消息对应的 tool_call_id
     @Default(null) String? toolCallId,
+
     /// 标记是否是工具结果气泡（UI展示用，不发送给API）
     @Default(false) bool isToolResultBubble,
   }) = _AiMessage;
 
   /// 创建 assistant 工具调用消息
-  factory AiMessage.assistantToolCalls(List<Map<String, dynamic>> toolCalls) {
+  factory AiMessage.assistantToolCalls(
+    List<Map<String, dynamic>> toolCalls, {
+    String? reasoningContent,
+  }) {
     return AiMessage(
       id: const Uuid().v4(),
       role: 'assistant',
       content: '',
+      reasoningContent: reasoningContent,
       toolCalls: toolCalls,
     );
   }
@@ -58,6 +66,7 @@ abstract class AiMessage with _$AiMessage {
       'id': id,
       'role': role,
       'content': content,
+      if (reasoningContent != null) 'reasoning_content': reasoningContent,
       'is_error': isError,
       'is_thinking': isThinking,
       if (toolCalls != null) 'tool_calls': toolCalls,
@@ -72,6 +81,7 @@ abstract class AiMessage with _$AiMessage {
       id: json['id']?.toString() ?? const Uuid().v4(),
       role: json['role']?.toString() ?? 'user',
       content: json['content']?.toString() ?? '',
+      reasoningContent: json['reasoning_content']?.toString(),
       isError: json['is_error'] == true,
       isThinking: json['is_thinking'] == true,
       toolCalls: rawToolCalls

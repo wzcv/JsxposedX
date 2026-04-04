@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 mixin _$AiMessage {
 
  String get id; String get role;// system, user, assistant, tool
- String get content; bool get isError; bool get isThinking;/// Function Calling: assistant 消息中携带的工具调用列表
+ String get content; String? get reasoningContent; bool get isError; bool get isThinking;/// Function Calling: assistant 消息中携带的工具调用列表
  List<Map<String, dynamic>>? get toolCalls;/// Function Calling: tool 消息对应的 tool_call_id
  String? get toolCallId;/// 标记是否是工具结果气泡（UI展示用，不发送给API）
  bool get isToolResultBubble;
@@ -29,16 +29,16 @@ $AiMessageCopyWith<AiMessage> get copyWith => _$AiMessageCopyWithImpl<AiMessage>
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiMessage&&(identical(other.id, id) || other.id == id)&&(identical(other.role, role) || other.role == role)&&(identical(other.content, content) || other.content == content)&&(identical(other.isError, isError) || other.isError == isError)&&(identical(other.isThinking, isThinking) || other.isThinking == isThinking)&&const DeepCollectionEquality().equals(other.toolCalls, toolCalls)&&(identical(other.toolCallId, toolCallId) || other.toolCallId == toolCallId)&&(identical(other.isToolResultBubble, isToolResultBubble) || other.isToolResultBubble == isToolResultBubble));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiMessage&&(identical(other.id, id) || other.id == id)&&(identical(other.role, role) || other.role == role)&&(identical(other.content, content) || other.content == content)&&(identical(other.reasoningContent, reasoningContent) || other.reasoningContent == reasoningContent)&&(identical(other.isError, isError) || other.isError == isError)&&(identical(other.isThinking, isThinking) || other.isThinking == isThinking)&&const DeepCollectionEquality().equals(other.toolCalls, toolCalls)&&(identical(other.toolCallId, toolCallId) || other.toolCallId == toolCallId)&&(identical(other.isToolResultBubble, isToolResultBubble) || other.isToolResultBubble == isToolResultBubble));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,id,role,content,isError,isThinking,const DeepCollectionEquality().hash(toolCalls),toolCallId,isToolResultBubble);
+int get hashCode => Object.hash(runtimeType,id,role,content,reasoningContent,isError,isThinking,const DeepCollectionEquality().hash(toolCalls),toolCallId,isToolResultBubble);
 
 @override
 String toString() {
-  return 'AiMessage(id: $id, role: $role, content: $content, isError: $isError, isThinking: $isThinking, toolCalls: $toolCalls, toolCallId: $toolCallId, isToolResultBubble: $isToolResultBubble)';
+  return 'AiMessage(id: $id, role: $role, content: $content, reasoningContent: $reasoningContent, isError: $isError, isThinking: $isThinking, toolCalls: $toolCalls, toolCallId: $toolCallId, isToolResultBubble: $isToolResultBubble)';
 }
 
 
@@ -49,7 +49,7 @@ abstract mixin class $AiMessageCopyWith<$Res>  {
   factory $AiMessageCopyWith(AiMessage value, $Res Function(AiMessage) _then) = _$AiMessageCopyWithImpl;
 @useResult
 $Res call({
- String id, String role, String content, bool isError, bool isThinking, List<Map<String, dynamic>>? toolCalls, String? toolCallId, bool isToolResultBubble
+ String id, String role, String content, String? reasoningContent, bool isError, bool isThinking, List<Map<String, dynamic>>? toolCalls, String? toolCallId, bool isToolResultBubble
 });
 
 
@@ -66,12 +66,13 @@ class _$AiMessageCopyWithImpl<$Res>
 
 /// Create a copy of AiMessage
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? role = null,Object? content = null,Object? isError = null,Object? isThinking = null,Object? toolCalls = freezed,Object? toolCallId = freezed,Object? isToolResultBubble = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? role = null,Object? content = null,Object? reasoningContent = freezed,Object? isError = null,Object? isThinking = null,Object? toolCalls = freezed,Object? toolCallId = freezed,Object? isToolResultBubble = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,role: null == role ? _self.role : role // ignore: cast_nullable_to_non_nullable
 as String,content: null == content ? _self.content : content // ignore: cast_nullable_to_non_nullable
-as String,isError: null == isError ? _self.isError : isError // ignore: cast_nullable_to_non_nullable
+as String,reasoningContent: freezed == reasoningContent ? _self.reasoningContent : reasoningContent // ignore: cast_nullable_to_non_nullable
+as String?,isError: null == isError ? _self.isError : isError // ignore: cast_nullable_to_non_nullable
 as bool,isThinking: null == isThinking ? _self.isThinking : isThinking // ignore: cast_nullable_to_non_nullable
 as bool,toolCalls: freezed == toolCalls ? _self.toolCalls : toolCalls // ignore: cast_nullable_to_non_nullable
 as List<Map<String, dynamic>>?,toolCallId: freezed == toolCallId ? _self.toolCallId : toolCallId // ignore: cast_nullable_to_non_nullable
@@ -161,10 +162,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String role,  String content,  bool isError,  bool isThinking,  List<Map<String, dynamic>>? toolCalls,  String? toolCallId,  bool isToolResultBubble)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String role,  String content,  String? reasoningContent,  bool isError,  bool isThinking,  List<Map<String, dynamic>>? toolCalls,  String? toolCallId,  bool isToolResultBubble)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _AiMessage() when $default != null:
-return $default(_that.id,_that.role,_that.content,_that.isError,_that.isThinking,_that.toolCalls,_that.toolCallId,_that.isToolResultBubble);case _:
+return $default(_that.id,_that.role,_that.content,_that.reasoningContent,_that.isError,_that.isThinking,_that.toolCalls,_that.toolCallId,_that.isToolResultBubble);case _:
   return orElse();
 
 }
@@ -182,10 +183,10 @@ return $default(_that.id,_that.role,_that.content,_that.isError,_that.isThinking
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String role,  String content,  bool isError,  bool isThinking,  List<Map<String, dynamic>>? toolCalls,  String? toolCallId,  bool isToolResultBubble)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String role,  String content,  String? reasoningContent,  bool isError,  bool isThinking,  List<Map<String, dynamic>>? toolCalls,  String? toolCallId,  bool isToolResultBubble)  $default,) {final _that = this;
 switch (_that) {
 case _AiMessage():
-return $default(_that.id,_that.role,_that.content,_that.isError,_that.isThinking,_that.toolCalls,_that.toolCallId,_that.isToolResultBubble);case _:
+return $default(_that.id,_that.role,_that.content,_that.reasoningContent,_that.isError,_that.isThinking,_that.toolCalls,_that.toolCallId,_that.isToolResultBubble);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -202,10 +203,10 @@ return $default(_that.id,_that.role,_that.content,_that.isError,_that.isThinking
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String role,  String content,  bool isError,  bool isThinking,  List<Map<String, dynamic>>? toolCalls,  String? toolCallId,  bool isToolResultBubble)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String role,  String content,  String? reasoningContent,  bool isError,  bool isThinking,  List<Map<String, dynamic>>? toolCalls,  String? toolCallId,  bool isToolResultBubble)?  $default,) {final _that = this;
 switch (_that) {
 case _AiMessage() when $default != null:
-return $default(_that.id,_that.role,_that.content,_that.isError,_that.isThinking,_that.toolCalls,_that.toolCallId,_that.isToolResultBubble);case _:
+return $default(_that.id,_that.role,_that.content,_that.reasoningContent,_that.isError,_that.isThinking,_that.toolCalls,_that.toolCallId,_that.isToolResultBubble);case _:
   return null;
 
 }
@@ -217,13 +218,14 @@ return $default(_that.id,_that.role,_that.content,_that.isError,_that.isThinking
 
 
 class _AiMessage extends AiMessage {
-  const _AiMessage({required this.id, required this.role, required this.content, this.isError = false, this.isThinking = false, final  List<Map<String, dynamic>>? toolCalls = null, this.toolCallId = null, this.isToolResultBubble = false}): _toolCalls = toolCalls,super._();
+  const _AiMessage({required this.id, required this.role, required this.content, this.reasoningContent = null, this.isError = false, this.isThinking = false, final  List<Map<String, dynamic>>? toolCalls = null, this.toolCallId = null, this.isToolResultBubble = false}): _toolCalls = toolCalls,super._();
   
 
 @override final  String id;
 @override final  String role;
 // system, user, assistant, tool
 @override final  String content;
+@override@JsonKey() final  String? reasoningContent;
 @override@JsonKey() final  bool isError;
 @override@JsonKey() final  bool isThinking;
 /// Function Calling: assistant 消息中携带的工具调用列表
@@ -252,16 +254,16 @@ _$AiMessageCopyWith<_AiMessage> get copyWith => __$AiMessageCopyWithImpl<_AiMess
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiMessage&&(identical(other.id, id) || other.id == id)&&(identical(other.role, role) || other.role == role)&&(identical(other.content, content) || other.content == content)&&(identical(other.isError, isError) || other.isError == isError)&&(identical(other.isThinking, isThinking) || other.isThinking == isThinking)&&const DeepCollectionEquality().equals(other._toolCalls, _toolCalls)&&(identical(other.toolCallId, toolCallId) || other.toolCallId == toolCallId)&&(identical(other.isToolResultBubble, isToolResultBubble) || other.isToolResultBubble == isToolResultBubble));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiMessage&&(identical(other.id, id) || other.id == id)&&(identical(other.role, role) || other.role == role)&&(identical(other.content, content) || other.content == content)&&(identical(other.reasoningContent, reasoningContent) || other.reasoningContent == reasoningContent)&&(identical(other.isError, isError) || other.isError == isError)&&(identical(other.isThinking, isThinking) || other.isThinking == isThinking)&&const DeepCollectionEquality().equals(other._toolCalls, _toolCalls)&&(identical(other.toolCallId, toolCallId) || other.toolCallId == toolCallId)&&(identical(other.isToolResultBubble, isToolResultBubble) || other.isToolResultBubble == isToolResultBubble));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,id,role,content,isError,isThinking,const DeepCollectionEquality().hash(_toolCalls),toolCallId,isToolResultBubble);
+int get hashCode => Object.hash(runtimeType,id,role,content,reasoningContent,isError,isThinking,const DeepCollectionEquality().hash(_toolCalls),toolCallId,isToolResultBubble);
 
 @override
 String toString() {
-  return 'AiMessage(id: $id, role: $role, content: $content, isError: $isError, isThinking: $isThinking, toolCalls: $toolCalls, toolCallId: $toolCallId, isToolResultBubble: $isToolResultBubble)';
+  return 'AiMessage(id: $id, role: $role, content: $content, reasoningContent: $reasoningContent, isError: $isError, isThinking: $isThinking, toolCalls: $toolCalls, toolCallId: $toolCallId, isToolResultBubble: $isToolResultBubble)';
 }
 
 
@@ -272,7 +274,7 @@ abstract mixin class _$AiMessageCopyWith<$Res> implements $AiMessageCopyWith<$Re
   factory _$AiMessageCopyWith(_AiMessage value, $Res Function(_AiMessage) _then) = __$AiMessageCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String role, String content, bool isError, bool isThinking, List<Map<String, dynamic>>? toolCalls, String? toolCallId, bool isToolResultBubble
+ String id, String role, String content, String? reasoningContent, bool isError, bool isThinking, List<Map<String, dynamic>>? toolCalls, String? toolCallId, bool isToolResultBubble
 });
 
 
@@ -289,12 +291,13 @@ class __$AiMessageCopyWithImpl<$Res>
 
 /// Create a copy of AiMessage
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? role = null,Object? content = null,Object? isError = null,Object? isThinking = null,Object? toolCalls = freezed,Object? toolCallId = freezed,Object? isToolResultBubble = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? role = null,Object? content = null,Object? reasoningContent = freezed,Object? isError = null,Object? isThinking = null,Object? toolCalls = freezed,Object? toolCallId = freezed,Object? isToolResultBubble = null,}) {
   return _then(_AiMessage(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,role: null == role ? _self.role : role // ignore: cast_nullable_to_non_nullable
 as String,content: null == content ? _self.content : content // ignore: cast_nullable_to_non_nullable
-as String,isError: null == isError ? _self.isError : isError // ignore: cast_nullable_to_non_nullable
+as String,reasoningContent: freezed == reasoningContent ? _self.reasoningContent : reasoningContent // ignore: cast_nullable_to_non_nullable
+as String?,isError: null == isError ? _self.isError : isError // ignore: cast_nullable_to_non_nullable
 as bool,isThinking: null == isThinking ? _self.isThinking : isThinking // ignore: cast_nullable_to_non_nullable
 as bool,toolCalls: freezed == toolCalls ? _self._toolCalls : toolCalls // ignore: cast_nullable_to_non_nullable
 as List<Map<String, dynamic>>?,toolCallId: freezed == toolCallId ? _self.toolCallId : toolCallId // ignore: cast_nullable_to_non_nullable

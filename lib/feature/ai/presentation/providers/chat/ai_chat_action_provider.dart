@@ -175,10 +175,7 @@ class AiChatAction extends _$AiChatAction {
       if (_isDisposed) {
         return;
       }
-      state = state.copyWith(
-        error: 'AI 会话加载失败',
-        isStreaming: false,
-      );
+      state = state.copyWith(error: 'AI 会话加载失败', isStreaming: false);
     }
   }
 
@@ -226,7 +223,8 @@ class AiChatAction extends _$AiChatAction {
     state = state.copyWith(
       currentSessionId: sessionId,
       protocolMessages: List<AiMessage>.unmodifiable(
-        contextAssembly.sanitizedProtocolMessages, // This sanitized version only cleans broken tools now, won't compact implicitly
+        contextAssembly
+            .sanitizedProtocolMessages, // This sanitized version only cleans broken tools now, won't compact implicitly
       ),
       messages: List<AiMessage>.unmodifiable(displayMessages),
       visibleMessageCount: 10,
@@ -308,9 +306,9 @@ class AiChatAction extends _$AiChatAction {
 
     if (state.currentSessionId == null) {
       // 这里的创建会引发 saveSessions 等 IO，绝对不能 await
-      unawaited(createSession(
-        '新对话 ${DateTime.now().hour}:${DateTime.now().minute}',
-      ));
+      unawaited(
+        createSession('新对话 ${DateTime.now().hour}:${DateTime.now().minute}'),
+      );
     }
 
     if (state.sessionInitState == AiSessionInitState.initializing) {
@@ -414,7 +412,9 @@ class AiChatAction extends _$AiChatAction {
   }
 
   void revealMessage(String messageId) {
-    final index = state.messages.indexWhere((message) => message.id == messageId);
+    final index = state.messages.indexWhere(
+      (message) => message.id == messageId,
+    );
     if (index == -1) {
       return;
     }
@@ -535,6 +535,7 @@ class AiChatAction extends _$AiChatAction {
         placeholderId: placeholderId,
         reasoningItems: response.responsesReasoningItems,
         initialContent: response.content,
+        initialThinkingContent: response.thinkingContent,
         initialDisplayContent: _composeDisplayContent(
           thinkingContent: response.thinkingContent,
           answerContent: response.content,
@@ -553,11 +554,16 @@ class AiChatAction extends _$AiChatAction {
       ),
       protocolMessages: [
         ...contextAssembly.sanitizedProtocolMessages,
-        ..._buildResponsesReasoningProtocolMessages(response.responsesReasoningItems),
+        ..._buildResponsesReasoningProtocolMessages(
+          response.responsesReasoningItems,
+        ),
         AiMessage(
           id: const Uuid().v4(),
           role: 'assistant',
           content: response.content,
+          reasoningContent: response.thinkingContent.isNotEmpty
+              ? response.thinkingContent
+              : null,
         ),
       ],
     );
@@ -570,6 +576,7 @@ class AiChatAction extends _$AiChatAction {
     required List<String> reasoningItems,
     required List<Map<String, dynamic>> toolCalls,
     required String initialContent,
+    required String initialThinkingContent,
     required String initialDisplayContent,
     List<Map<String, dynamic>>? toolsJson,
   }) async {
@@ -587,6 +594,12 @@ class AiChatAction extends _$AiChatAction {
       id: const Uuid().v4(),
       role: 'assistant',
       content: initialContent,
+      reasoningContent: _normalizeReasoningContentForProtocol(
+        reasoningItems: reasoningItems,
+        thinkingContent: config.apiType == AiApiType.openai
+            ? initialThinkingContent
+            : '',
+      ),
       toolCalls: toolCalls,
     );
     var nextProtocolMessages = [
@@ -811,43 +824,43 @@ class AiChatAction extends _$AiChatAction {
               return;
             }
             completer.complete(
-                _CollectedAssistantResponse(
-                  content: bufferedContent,
-                  thinkingContent: thinkingBuffer.toString(),
-                  responsesReasoningItems: List<String>.unmodifiable(
-                    responsesReasoningItems,
-                  ),
-                  issue: _classifyPlatformIssue(error),
-                  errorMessage: _describePlatformException(error),
+              _CollectedAssistantResponse(
+                content: bufferedContent,
+                thinkingContent: thinkingBuffer.toString(),
+                responsesReasoningItems: List<String>.unmodifiable(
+                  responsesReasoningItems,
                 ),
+                issue: _classifyPlatformIssue(error),
+                errorMessage: _describePlatformException(error),
+              ),
             );
             return;
           }
 
           if (bufferedContent.isNotEmpty) {
             completer.complete(
-                _CollectedAssistantResponse(
-                  content: bufferedContent,
-                  thinkingContent: thinkingBuffer.toString(),
-                  responsesReasoningItems: List<String>.unmodifiable(
-                    responsesReasoningItems,
-                  ),
-                  issue: AiResponseIssue.partialResponse,
-                  errorMessage: error.toString(),
+              _CollectedAssistantResponse(
+                content: bufferedContent,
+                thinkingContent: thinkingBuffer.toString(),
+                responsesReasoningItems: List<String>.unmodifiable(
+                  responsesReasoningItems,
                 ),
+                issue: AiResponseIssue.partialResponse,
+                errorMessage: error.toString(),
+              ),
             );
             return;
           }
 
           completer.complete(
-              _CollectedAssistantResponse(
-                content: '',
-                responsesReasoningItems: List<String>.unmodifiable(
-                  responsesReasoningItems,
-                ),
-                issue: AiResponseIssue.networkError,
-                errorMessage: error.toString(),
+            _CollectedAssistantResponse(
+              content: '',
+              responsesReasoningItems: List<String>.unmodifiable(
+                responsesReasoningItems,
               ),
+              issue: AiResponseIssue.networkError,
+              errorMessage: error.toString(),
+            ),
           );
         },
         onDone: () {
@@ -968,7 +981,8 @@ class AiChatAction extends _$AiChatAction {
     }
 
     final isZh = state.systemPrompt?.contains('你是') ?? true;
-    final apiType = ref.read(aiConfigProvider).value?.apiType ?? AiApiType.openai;
+    final apiType =
+        ref.read(aiConfigProvider).value?.apiType ?? AiApiType.openai;
     return PromptBuilder(
       isZh: isZh,
     ).withTools().withSoTools().buildToolsJson(apiType: apiType);
@@ -1202,6 +1216,9 @@ class AiChatAction extends _$AiChatAction {
           id: const Uuid().v4(),
           role: 'assistant',
           content: partialContent,
+          reasoningContent: _latestStreamingThinkingContent.trim().isNotEmpty
+              ? _latestStreamingThinkingContent.trim()
+              : null,
         ),
       ]);
     } else if (!hasPendingToolPhase) {
@@ -1224,10 +1241,7 @@ class AiChatAction extends _$AiChatAction {
     final completer = _activeResponseCompleter;
     if (completer != null && !completer.isCompleted) {
       completer.complete(
-        _CollectedAssistantResponse(
-          content: partialContent,
-          userStopped: true,
-        ),
+        _CollectedAssistantResponse(content: partialContent, userStopped: true),
       );
     }
   }
@@ -1313,11 +1327,13 @@ class AiChatAction extends _$AiChatAction {
             sessions: List<AiSession>.unmodifiable(updatedSessions),
           );
         });
-        
+
         // 这里的持久化 IO 已经在异步块内，但是为了双重保险，确保不被 await
-        unawaited(ref
-            .read(aiChatActionRepositoryProvider)
-            .saveSessions(packageName, updatedSessions));
+        unawaited(
+          ref
+              .read(aiChatActionRepositoryProvider)
+              .saveSessions(packageName, updatedSessions),
+        );
       }
     } catch (_) {
       // Keep UI responsive even if persistence fails.
@@ -1329,6 +1345,18 @@ class AiChatAction extends _$AiChatAction {
   ) {
     return protocolMessages
         .where((message) => message.shouldDisplayInChatList)
+        .map((message) {
+          if (message.role != 'assistant' ||
+              (message.reasoningContent?.trim().isEmpty ?? true)) {
+            return message;
+          }
+          return message.copyWith(
+            content: _composeDisplayContent(
+              thinkingContent: message.reasoningContent!,
+              answerContent: message.content,
+            ),
+          );
+        })
         .toList(growable: false);
   }
 
@@ -1380,7 +1408,9 @@ class AiChatAction extends _$AiChatAction {
 
         // 更新最终状态：同步上下文、版本和统计数据
         state = state.copyWith(
-          sessionContext: contextAssembly.context.copyWith(checkpoint: checkpoint),
+          sessionContext: contextAssembly.context.copyWith(
+            checkpoint: checkpoint,
+          ),
           contextStats: contextAssembly.context.stats,
           contextVersion: contextAssembly.context.version,
         );
@@ -1439,9 +1469,7 @@ class AiChatAction extends _$AiChatAction {
 
   List<AiMessage> _sanitizeProtocolMessages(List<AiMessage> protocolMessages) {
     final latestSummary = _findLatestSessionSummary(protocolMessages);
-    final sanitized = <AiMessage>[
-      if (latestSummary != null) latestSummary,
-    ];
+    final sanitized = <AiMessage>[if (latestSummary != null) latestSummary];
     final pendingToolCallIds = <String>{};
     var awaitingToolResults = false;
 
@@ -1652,10 +1680,7 @@ class AiChatAction extends _$AiChatAction {
     if (message.role != 'user') {
       return message.content;
     }
-    return AiMultimodalMessageCodec.toSemanticText(
-      message.content,
-      isZh: true,
-    );
+    return AiMultimodalMessageCodec.toSemanticText(message.content, isZh: true);
   }
 
   String _buildContinuationPrompt(String partialContent) {
@@ -1802,10 +1827,9 @@ class AiChatAction extends _$AiChatAction {
     }
 
     String? currentTitle;
-    final lines = _stripSessionSummaryPrefix(summary)
-        .split('\n')
-        .map((line) => line.trim())
-        .where((line) => line.isNotEmpty);
+    final lines = _stripSessionSummaryPrefix(
+      summary,
+    ).split('\n').map((line) => line.trim()).where((line) => line.isNotEmpty);
 
     for (final line in lines) {
       if (line.endsWith('：')) {
@@ -1956,6 +1980,20 @@ class AiChatAction extends _$AiChatAction {
         .toList(growable: false);
   }
 
+  String? _normalizeReasoningContentForProtocol({
+    required List<String> reasoningItems,
+    required String thinkingContent,
+  }) {
+    if (reasoningItems.isNotEmpty) {
+      return null;
+    }
+    final normalized = thinkingContent.trim();
+    if (normalized.isEmpty) {
+      return null;
+    }
+    return normalized;
+  }
+
   void _markDisplayMessageError(
     String placeholderId,
     String message,
@@ -2063,11 +2101,7 @@ class AiChatAction extends _$AiChatAction {
     );
   }
 
-
-
-  Future<void> _finishStoppedToolPhase({
-    required AiConfig config,
-  }) async {
+  Future<void> _finishStoppedToolPhase({required AiConfig config}) async {
     state = state.copyWith(
       isStreaming: false,
       error: null,
@@ -2254,7 +2288,9 @@ class AiChatAction extends _$AiChatAction {
   }) async {
     final config = ref.read(aiConfigProvider).value;
     final checkpoint = state.sessionContext.checkpoint;
-    if (config == null || checkpoint == null || checkpoint.protocolMessages.isEmpty) {
+    if (config == null ||
+        checkpoint == null ||
+        checkpoint.protocolMessages.isEmpty) {
       return;
     }
 
@@ -2271,9 +2307,7 @@ class AiChatAction extends _$AiChatAction {
     );
     final contextAssembly = _assembleContext(
       protocolMessages: restoredProtocolMessages,
-      previousContext: state.sessionContext.copyWith(
-        checkpoint: checkpoint,
-      ),
+      previousContext: state.sessionContext.copyWith(checkpoint: checkpoint),
       config: config,
       recoveryMode: recoveryMode,
     );

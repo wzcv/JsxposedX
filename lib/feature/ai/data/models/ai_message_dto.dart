@@ -15,6 +15,8 @@ abstract class AiMessageDto with _$AiMessageDto {
     @JsonKey(includeFromJson: false, includeToJson: false) String? id,
     @Default("user") String role,
     @Default("") String content,
+    @JsonKey(name: 'reasoning_content', includeIfNull: false)
+    String? reasoningContent,
     @JsonKey(includeFromJson: false, includeToJson: false)
     @Default(false)
     bool isThinking,
@@ -39,6 +41,7 @@ abstract class AiMessageDto with _$AiMessageDto {
       id: json['id'] as String?,
       role: json['role'] as String? ?? 'user',
       content: json['content'] as String? ?? '',
+      reasoningContent: json['reasoning_content'] as String?,
       isThinking: json['is_thinking'] == true,
       toolCalls: rawToolCalls
           ?.map((item) => Map<String, dynamic>.from(item as Map))
@@ -54,8 +57,10 @@ abstract class AiMessageDto with _$AiMessageDto {
       if (id != null && id!.isNotEmpty) 'id': id,
       'role': role,
       'content': content,
+      if (reasoningContent != null) 'reasoning_content': reasoningContent,
       if (toolCalls != null) 'tool_calls': toolCalls,
       if (toolCallId != null) 'tool_call_id': toolCallId,
+      'is_thinking': isThinking,
       'is_error': isError,
       'is_tool_result_bubble': isToolResultBubble,
     };
@@ -66,6 +71,7 @@ abstract class AiMessageDto with _$AiMessageDto {
       id: id != null && id!.isNotEmpty ? id! : const Uuid().v4(),
       role: role,
       content: content,
+      reasoningContent: reasoningContent,
       isError: isError,
       isThinking: isThinking,
       toolCalls: toolCalls,
@@ -81,18 +87,9 @@ abstract class AiMessageDto with _$AiMessageDto {
   factory AiMessageDto.toolResult({
     required String toolCallId,
     required String content,
-  }) =>
-      AiMessageDto(
-        role: 'tool',
-        content: content,
-        toolCallId: toolCallId,
-      );
+  }) => AiMessageDto(role: 'tool', content: content, toolCallId: toolCallId);
 
   /// 构建 assistant 带 tool_calls 的消息
   factory AiMessageDto.assistantToolCalls(List<Map<String, dynamic>> calls) =>
-      AiMessageDto(
-        role: 'assistant',
-        content: '',
-        toolCalls: calls,
-      );
+      AiMessageDto(role: 'assistant', content: '', toolCalls: calls);
 }

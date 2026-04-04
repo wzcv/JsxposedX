@@ -24,121 +24,215 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:riverpod/riverpod.dart';
 
 void main() {
-  test('replays reasoning items on the next user turn after a tool-call round', () async {
-    final firstReasoning = OpenAiResponsesReasoningItemCodec.encode(const {
-      'id': 'rs_1',
-      'type': 'reasoning',
-      'encrypted_content': 'encrypted_1',
-    });
-    final secondReasoning = OpenAiResponsesReasoningItemCodec.encode(const {
-      'id': 'rs_2',
-      'type': 'reasoning',
-      'encrypted_content': 'encrypted_2',
-    });
-    final toolCall = <Map<String, dynamic>>[
-      {
-        'id': 'call_1',
-        'type': 'function',
-        'function': {
-          'name': 'search_classes',
-          'arguments': '{"keyword":"vip"}',
+  test(
+    'replays reasoning items on the next user turn after a tool-call round',
+    () async {
+      final firstReasoning = OpenAiResponsesReasoningItemCodec.encode(const {
+        'id': 'rs_1',
+        'type': 'reasoning',
+        'encrypted_content': 'encrypted_1',
+      });
+      final secondReasoning = OpenAiResponsesReasoningItemCodec.encode(const {
+        'id': 'rs_2',
+        'type': 'reasoning',
+        'encrypted_content': 'encrypted_2',
+      });
+      final toolCall = <Map<String, dynamic>>[
+        {
+          'id': 'call_1',
+          'type': 'function',
+          'function': {
+            'name': 'search_classes',
+            'arguments': '{"keyword":"vip"}',
+          },
         },
-      },
-    ];
+      ];
 
-    final fakeActionRepo = _FakeAiChatActionRepository(
-      queuedStreams: Queue<List<AiMessage>>.from([
-        [
-          AiMessage(
-            id: 'reasoning-first',
-            role: 'system',
-            content: firstReasoning,
-          ),
-          AiMessage.assistantToolCalls(toolCall),
-        ],
-        [
-          AiMessage(
-            id: 'reasoning-second',
-            role: 'system',
-            content: secondReasoning,
-          ),
-          AiMessage(
-            id: 'assistant-final',
-            role: 'assistant',
-            content: 'VIP 已处理完',
-          ),
-        ],
-        [
-          AiMessage(
-            id: 'assistant-next',
-            role: 'assistant',
-            content: '继续分析',
-          ),
-        ],
-      ]),
-    );
+      final fakeActionRepo = _FakeAiChatActionRepository(
+        queuedStreams: Queue<List<AiMessage>>.from([
+          [
+            AiMessage(
+              id: 'reasoning-first',
+              role: 'system',
+              content: firstReasoning,
+            ),
+            AiMessage.assistantToolCalls(toolCall),
+          ],
+          [
+            AiMessage(
+              id: 'reasoning-second',
+              role: 'system',
+              content: secondReasoning,
+            ),
+            AiMessage(
+              id: 'assistant-final',
+              role: 'assistant',
+              content: 'VIP 已处理完',
+            ),
+          ],
+          [AiMessage(id: 'assistant-next', role: 'assistant', content: '继续分析')],
+        ]),
+      );
 
-    final container = ProviderContainer(
-      overrides: [
-        aiChatActionRepositoryProvider.overrideWithValue(fakeActionRepo),
-        aiChatQueryRepositoryProvider.overrideWithValue(_FakeAiChatQueryRepository()),
-        aiConfigQueryRepositoryProvider.overrideWithValue(
-          _FakeAiConfigQueryRepository(
-            const AiConfig(
-              id: 'test-responses',
-              name: 'Responses',
-              apiKey: 'sk-test',
-              apiUrl: 'https://example.com/v1',
-              moduleName: 'gpt-5.4',
-              maxToken: 4096,
-              temperature: 1,
-              memoryRounds: 6,
-              apiType: AiApiType.openaiResponses,
+      final container = ProviderContainer(
+        overrides: [
+          aiChatActionRepositoryProvider.overrideWithValue(fakeActionRepo),
+          aiChatQueryRepositoryProvider.overrideWithValue(
+            _FakeAiChatQueryRepository(),
+          ),
+          aiConfigQueryRepositoryProvider.overrideWithValue(
+            _FakeAiConfigQueryRepository(
+              const AiConfig(
+                id: 'test-responses',
+                name: 'Responses',
+                apiKey: 'sk-test',
+                apiUrl: 'https://example.com/v1',
+                moduleName: 'gpt-5.4',
+                maxToken: 4096,
+                temperature: 1,
+                memoryRounds: 6,
+                apiType: AiApiType.openaiResponses,
+              ),
             ),
           ),
-        ),
-        apkAnalysisQueryRepositoryProvider.overrideWithValue(
-          _FakeApkAnalysisQueryRepository(),
-        ),
-        soAnalysisDatasourceProvider.overrideWithValue(_FakeSoAnalysisDatasource()),
-      ],
-    );
-    addTearDown(container.dispose);
+          apkAnalysisQueryRepositoryProvider.overrideWithValue(
+            _FakeApkAnalysisQueryRepository(),
+          ),
+          soAnalysisDatasourceProvider.overrideWithValue(
+            _FakeSoAnalysisDatasource(),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
 
-    await container.read(aiConfigProvider.future);
-    final notifier = container.read(
-      aiChatActionProvider(packageName: 'com.test.app').notifier,
-    );
-    notifier.setApkSession('apk-session', const ['classes.dex']);
-    notifier.markSessionReady();
+      await container.read(aiConfigProvider.future);
+      final provider = aiChatActionProvider(packageName: 'com.test.app');
+      final sub = container.listen(provider, (_, __) {});
+      addTearDown(sub.close);
+      final notifier = container.read(provider.notifier);
+      notifier.setApkSession('apk-session', const ['classes.dex']);
+      notifier.markSessionReady();
 
-    await notifier.send('帮我写一个hook vip的脚本');
-    await notifier.send('帮我看看');
+      await notifier.send('帮我写一个hook vip的脚本');
+      await _waitFor(
+        () =>
+            fakeActionRepo.capturedRequests.length >= 2 &&
+            !container.read(provider).isStreaming,
+      );
+      expect(fakeActionRepo.capturedRequests.length, 2);
 
-    expect(fakeActionRepo.capturedRequests.length, 3);
+      final replayMessages = [
+        ...container.read(provider).protocolMessages,
+        AiMessage(id: 'follow-up-user', role: 'user', content: '帮我看看'),
+      ];
+      final replayInput = OpenAiResponsesPayloadComposer.buildInput(
+        replayMessages.map(_toDto).toList(growable: false),
+      );
+      final toolOutputs = replayInput
+          .where((item) => item['type'] == 'function_call_output')
+          .toList(growable: false);
 
-    final replayMessages = fakeActionRepo.capturedRequests[2];
-    final replayInput = OpenAiResponsesPayloadComposer.buildInput(
-      replayMessages.map(_toDto).toList(growable: false),
-    );
-    final toolOutputs = replayInput
-        .where((item) => item['type'] == 'function_call_output')
-        .toList(growable: false);
-
-    expect(
-      replayInput.where((item) => item['type'] == 'reasoning').length,
-      2,
-    );
-    expect(toolOutputs, hasLength(1));
-    expect(
-      toolOutputs.single,
-      {
+      expect(
+        replayInput.where((item) => item['type'] == 'reasoning').length,
+        2,
+      );
+      expect(toolOutputs, hasLength(1));
+      expect(toolOutputs.single, {
         'type': 'function_call_output',
         'call_id': 'call_1',
         'output': '共找到 1 个匹配类：\ncom.example.VipManager',
-      },
-    );
-  });
+      });
+    },
+  );
+
+  test(
+    'keeps reasoning content on openai assistant tool-call replay messages',
+    () async {
+      final toolCall = <Map<String, dynamic>>[
+        {
+          'id': 'call_1',
+          'type': 'function',
+          'function': {
+            'name': 'search_classes',
+            'arguments': '{"keyword":"vip"}',
+          },
+        },
+      ];
+
+      final fakeActionRepo = _FakeAiChatActionRepository(
+        queuedStreams: Queue<List<AiMessage>>.from([
+          [
+            AiMessage(
+              id: 'thinking-1',
+              role: 'assistant',
+              content: '先看看 VIP 相关类',
+              isThinking: true,
+            ),
+            AiMessage.assistantToolCalls(toolCall),
+          ],
+          [
+            AiMessage(
+              id: 'assistant-final',
+              role: 'assistant',
+              content: '找到了可疑类',
+            ),
+          ],
+        ]),
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          aiChatActionRepositoryProvider.overrideWithValue(fakeActionRepo),
+          aiChatQueryRepositoryProvider.overrideWithValue(
+            _FakeAiChatQueryRepository(),
+          ),
+          aiConfigQueryRepositoryProvider.overrideWithValue(
+            _FakeAiConfigQueryRepository(
+              const AiConfig(
+                id: 'test-openai',
+                name: 'OpenAI Compat',
+                apiKey: 'sk-test',
+                apiUrl: 'https://example.com/v1',
+                moduleName: 'deepseek-r1',
+                maxToken: 4096,
+                temperature: 1,
+                memoryRounds: 6,
+                apiType: AiApiType.openai,
+              ),
+            ),
+          ),
+          apkAnalysisQueryRepositoryProvider.overrideWithValue(
+            _FakeApkAnalysisQueryRepository(),
+          ),
+          soAnalysisDatasourceProvider.overrideWithValue(
+            _FakeSoAnalysisDatasource(),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(aiConfigProvider.future);
+      final provider = aiChatActionProvider(packageName: 'com.test.openai');
+      final sub = container.listen(provider, (_, __) {});
+      addTearDown(sub.close);
+      final notifier = container.read(provider.notifier);
+      notifier.setApkSession('apk-session', const ['classes.dex']);
+      notifier.markSessionReady();
+
+      await notifier.send('帮我找 vip 逻辑');
+      await _waitFor(
+        () =>
+            fakeActionRepo.capturedRequests.length >= 2 &&
+            !container.read(provider).isStreaming,
+      );
+
+      expect(fakeActionRepo.capturedRequests.length, 2);
+      _expectAssistantToolCallWithReasoning(
+        fakeActionRepo.capturedRequests[1],
+        reasoningContent: '先看看 VIP 相关类',
+      );
+    },
+  );
 }
 
 AiMessageDto _toDto(AiMessage message) {
@@ -146,12 +240,36 @@ AiMessageDto _toDto(AiMessage message) {
     id: message.id,
     role: message.role,
     content: message.content,
+    reasoningContent: message.reasoningContent,
     isThinking: message.isThinking,
     toolCalls: message.toolCalls,
     toolCallId: message.toolCallId,
     isError: message.isError,
     isToolResultBubble: message.isToolResultBubble,
   );
+}
+
+void _expectAssistantToolCallWithReasoning(
+  List<AiMessage> messages, {
+  required String reasoningContent,
+}) {
+  final assistantToolMessage = messages.lastWhere(
+    (message) => message.role == 'assistant' && message.hasToolCalls,
+  );
+  expect(assistantToolMessage.reasoningContent, reasoningContent);
+}
+
+Future<void> _waitFor(
+  bool Function() condition, {
+  Duration timeout = const Duration(seconds: 5),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (!condition()) {
+    if (DateTime.now().isAfter(deadline)) {
+      break;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+  }
 }
 
 final class _FakeAiConfigQueryRepository implements AiConfigQueryRepository {
@@ -168,8 +286,10 @@ final class _FakeAiChatQueryRepository implements AiChatQueryRepository {
   Future<List<AiSession>> getSessions(String packageName) async => const [];
 
   @override
-  Future<List<AiMessage>> getChatHistory(String packageName, String sessionId) async =>
-      const [];
+  Future<List<AiMessage>> getChatHistory(
+    String packageName,
+    String sessionId,
+  ) async => const [];
 
   @override
   Future<AiChatSessionContext?> getSessionContext(
@@ -189,7 +309,7 @@ final class _FakeAiChatQueryRepository implements AiChatQueryRepository {
 
 final class _FakeAiChatActionRepository implements AiChatActionRepository {
   _FakeAiChatActionRepository({required Queue<List<AiMessage>> queuedStreams})
-      : _queuedStreams = queuedStreams;
+    : _queuedStreams = queuedStreams;
 
   final Queue<List<AiMessage>> _queuedStreams;
   final List<List<AiMessage>> capturedRequests = <List<AiMessage>>[];
@@ -213,7 +333,10 @@ final class _FakeAiChatActionRepository implements AiChatActionRepository {
   Future<String> testConnection(AiConfig config) async => 'ok';
 
   @override
-  Future<void> saveSessions(String packageName, List<AiSession> sessions) async {}
+  Future<void> saveSessions(
+    String packageName,
+    List<AiSession> sessions,
+  ) async {}
 
   @override
   Future<void> saveChatHistory(
@@ -237,7 +360,10 @@ final class _FakeAiChatActionRepository implements AiChatActionRepository {
   ) async {}
 
   @override
-  Future<void> saveLastActiveSessionId(String packageName, String sessionId) async {}
+  Future<void> saveLastActiveSessionId(
+    String packageName,
+    String sessionId,
+  ) async {}
 
   @override
   Future<void> clearLastActiveSessionId(String packageName) async {}
@@ -246,7 +372,8 @@ final class _FakeAiChatActionRepository implements AiChatActionRepository {
   Future<void> deleteSession(String packageName, String sessionId) async {}
 }
 
-final class _FakeApkAnalysisQueryRepository implements ApkAnalysisQueryRepository {
+final class _FakeApkAnalysisQueryRepository
+    implements ApkAnalysisQueryRepository {
   @override
   Future<List<String>> searchDexClasses(
     String sessionId,
