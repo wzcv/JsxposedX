@@ -2,6 +2,7 @@ import 'package:JsxposedX/core/models/page_result.dart';
 import 'package:JsxposedX/features/home/data/datasources/repository_query_datasource.dart';
 import 'package:JsxposedX/features/home/domain/models/post.dart';
 import 'package:JsxposedX/features/home/domain/models/post_detail.dart';
+import 'package:JsxposedX/features/home/domain/models/user_detail.dart';
 import 'package:JsxposedX/features/home/domain/repositories/repository_query_repository.dart';
 
 class RepositoryQueryRepositoryImpl implements RepositoryQueryRepository {
@@ -34,5 +35,11 @@ class RepositoryQueryRepositoryImpl implements RepositoryQueryRepository {
       offset: offset,
     );
     return dto.toEntity((d) => d.toEntity());
+  }
+
+  @override
+  Future<UserDetail> getMyUserDetail({required String token}) async {
+    final dto = await dataSource.getMyUserDetail(token: token);
+    return dto.toEntity();
   }
 }

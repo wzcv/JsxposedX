@@ -1,3 +1,4 @@
+import 'package:JsxposedX/common/widgets/cache_image.dart';
 import 'package:JsxposedX/common/widgets/custom_tab_bar.dart';
 import 'package:JsxposedX/core/extensions/context_extensions.dart';
 import 'package:JsxposedX/features/home/presentation/pages/tabs/repository_tab/tabs/new_script_tab.dart';
@@ -14,8 +15,6 @@ class RepositoryTab extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tabController = useTabController(initialLength: 2);
-    final currentTabIndex = useState(0);
-
     return Scaffold(
       appBar: AppBar(
         title: CustomTabBar(
@@ -25,6 +24,19 @@ class RepositoryTab extends HookConsumerWidget {
             Tab(text: context.l10n.star), //收藏
           ],
         ),
+        actions: [
+          InkWell(
+            onTap: () {
+
+
+
+
+
+
+            },
+            child: CacheImage(imageUrl: "", size: 35.sp),
+          ),
+        ],
       ),
       body: Padding(
         padding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 10.w),

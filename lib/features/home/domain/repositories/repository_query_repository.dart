@@ -1,6 +1,7 @@
 import 'package:JsxposedX/core/models/page_result.dart';
 import 'package:JsxposedX/features/home/domain/models/post.dart';
 import 'package:JsxposedX/features/home/domain/models/post_detail.dart';
+import 'package:JsxposedX/features/home/domain/models/user_detail.dart';
 
 abstract class RepositoryQueryRepository {
   Future<PageResult<Post>> getScriptPosts({
@@ -14,4 +15,5 @@ abstract class RepositoryQueryRepository {
     required int limit,
     required int offset,
   });
+  Future<UserDetail> getMyUserDetail({required String token});
 }

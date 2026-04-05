@@ -302,3 +302,77 @@ final class GetScriptFavoritePostsFamily extends $Family
   @override
   String toString() => r'getScriptFavoritePostsProvider';
 }
+
+@ProviderFor(getMyUserDetail)
+const getMyUserDetailProvider = GetMyUserDetailFamily._();
+
+final class GetMyUserDetailProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<UserDetail>,
+          UserDetail,
+          FutureOr<UserDetail>
+        >
+    with $FutureModifier<UserDetail>, $FutureProvider<UserDetail> {
+  const GetMyUserDetailProvider._({
+    required GetMyUserDetailFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'getMyUserDetailProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$getMyUserDetailHash();
+
+  @override
+  String toString() {
+    return r'getMyUserDetailProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<UserDetail> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<UserDetail> create(Ref ref) {
+    final argument = this.argument as String;
+    return getMyUserDetail(ref, token: argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is GetMyUserDetailProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$getMyUserDetailHash() => r'24885bb314922a450bcea9e7ca8fc97adb1da837';
+
+final class GetMyUserDetailFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<UserDetail>, String> {
+  const GetMyUserDetailFamily._()
+    : super(
+        retry: null,
+        name: r'getMyUserDetailProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  GetMyUserDetailProvider call({required String token}) =>
+      GetMyUserDetailProvider._(argument: token, from: this);
+
+  @override
+  String toString() => r'getMyUserDetailProvider';
+}

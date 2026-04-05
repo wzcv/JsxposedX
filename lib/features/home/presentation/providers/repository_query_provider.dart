@@ -1,6 +1,7 @@
 import 'package:JsxposedX/core/models/page_result.dart';
 import 'package:JsxposedX/features/home/domain/models/post.dart';
 import 'package:JsxposedX/features/home/domain/models/post_detail.dart';
+import 'package:JsxposedX/features/home/domain/models/user_detail.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:JsxposedX/core/networks/http_service.dart';
 import 'package:JsxposedX/features/home/data/datasources/repository_query_datasource.dart';
@@ -43,4 +44,11 @@ Future<PageResult<Post>> getScriptFavoritePosts(
   return ref
       .read(repositoryQueryRepositoryProvider)
       .getScriptFavoritePosts(limit: limit, offset: offset);
+}
+
+@riverpod
+Future<UserDetail> getMyUserDetail(Ref ref, {required String token}) async {
+  return await ref
+      .read(repositoryQueryRepositoryProvider)
+      .getMyUserDetail(token: token);
 }
