@@ -10,6 +10,7 @@ import 'package:JsxposedX/features/frida/presentation/pages/frida_api_manual_pag
 import 'package:JsxposedX/features/frida/presentation/pages/frida_editor_page.dart';
 import 'package:JsxposedX/features/frida/presentation/pages/frida_project_page.dart';
 import 'package:JsxposedX/features/project/presentation/pages/quick_functions_page.dart';
+import 'package:JsxposedX/features/system_overlay/presentation/pages/system_overlay_page.dart';
 import 'package:JsxposedX/features/xposed/presentation/pages/ai_api_manual_page.dart';
 import 'package:JsxposedX/features/xposed/presentation/pages/api_manual_page.dart';
 import 'package:JsxposedX/features/xposed/presentation/pages/xposed_editor_page.dart';
@@ -39,6 +40,7 @@ class HomeRoute {
   static const fridaApiManual = '/fridaApiManual';
   static const soAnalysis = '/soAnalysis/:packageName';
   static const scriptDetail = '/scriptDetail/:id';
+  static const systemOverlay = '/systemOverlay';
   static const login = 'login';
 
   static String toQuickFunctions({required AppInfo app}) => '/quickFunctions';
@@ -178,5 +180,9 @@ List<GoRoute> homeRoutes = [
       final id = state.pathParameters["id"]!;
       return ScriptDetailPage(id: int.tryParse(id) ?? -1);
     },
+  ),
+  GoRoute(
+    path: HomeRoute.systemOverlay,
+    builder: (context, state) => const SystemOverlayPage(),
   ),
 ];

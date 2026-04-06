@@ -6,6 +6,7 @@ import 'package:JsxposedX/core/extensions/context_extensions.dart';
 import 'package:JsxposedX/core/providers/locale_provider.dart';
 import 'package:JsxposedX/core/providers/status_management_provider.dart';
 import 'package:JsxposedX/core/providers/theme_provider.dart';
+import 'package:JsxposedX/core/routes/routes/home_route.dart';
 import 'package:JsxposedX/core/utils/procedure_utils.dart';
 import 'package:JsxposedX/core/utils/url_helper.dart';
 import 'package:JsxposedX/features/ai/presentation/widgets/ai_config_sheet.dart';
@@ -16,6 +17,7 @@ import 'package:JsxposedX/features/home/presentation/widgets/theme_color_picker.
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 const String _forumHost = 'muxue.pro';
@@ -136,6 +138,13 @@ class SettingsTab extends HookConsumerWidget {
                   }
                   AIConfigSheet.show(context);
                 },
+              ),
+              const SettingsDivider(),
+              SettingsTile(
+                icon: Icons.picture_in_picture_alt_rounded,
+                title: context.isZh ? '系统悬浮窗' : 'System overlay',
+                subtitle: context.isZh ? '权限、显示与调试' : 'permission and controls',
+                onTap: () => context.push(HomeRoute.systemOverlay),
               ),
             ],
           ),
