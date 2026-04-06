@@ -26,11 +26,16 @@ class OverlayWindow extends StatelessWidget {
 
   static Future<OverlayWindowStatus> show(
     BuildContext context, {
+    required int scene,
     OverlayWindowPresentation presentation = const OverlayWindowPresentation(),
   }) {
     return OverlayWindowScope.of(
       context,
-    ).show(context, presentation: presentation);
+    ).show(
+      context,
+      scene: scene,
+      presentation: presentation,
+    );
   }
 
   static Future<OverlayWindowStatus> dismiss(BuildContext context) {

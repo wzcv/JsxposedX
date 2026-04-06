@@ -58,6 +58,7 @@ class OverlayWindowController extends ChangeNotifier {
 
   Future<OverlayWindowStatus> show(
     BuildContext context, {
+    required int scene,
     OverlayWindowPresentation presentation =
         const OverlayWindowPresentation(),
   }) async {
@@ -93,6 +94,7 @@ class OverlayWindowController extends ChangeNotifier {
       overlayTitle: notificationTitle,
       overlayContent: notificationContent,
     );
+    await FlutterOverlayWindow.shareData(scene);
     return refresh();
   }
 

@@ -139,13 +139,6 @@ class SettingsTab extends HookConsumerWidget {
                   AIConfigSheet.show(context);
                 },
               ),
-              const SettingsDivider(),
-              SettingsTile(
-                icon: Icons.picture_in_picture_alt_rounded,
-                title: context.isZh ? '系统悬浮窗' : 'System overlay',
-                subtitle: context.isZh ? '权限、显示与调试' : 'permission and controls',
-                onTap: () => context.push(HomeRoute.systemOverlay),
-              ),
             ],
           ),
         ),
