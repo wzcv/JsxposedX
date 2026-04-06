@@ -68,6 +68,7 @@ class OverlayApp extends StatelessWidget {
           themeMode: themeMode,
           debugShowCheckedModeBanner: false,
           home: const OverlayWindowRenderer(),
+          builder: FlutterSmartDialog.init(),
         );
       },
     );
