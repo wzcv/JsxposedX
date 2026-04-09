@@ -1,6 +1,9 @@
 import 'package:JsxposedX/common/widgets/app_bootstrap.dart';
+import 'package:JsxposedX/core/themes/app_theme.dart';
+import 'package:JsxposedX/features/overlay_window/presentation/providers/overlay_app_payload_provider.dart';
 import 'package:JsxposedX/features/overlay_window/presentation/pages/overlay_window_host_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class OverlaySubApp extends ConsumerWidget {
@@ -8,8 +11,23 @@ class OverlaySubApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return AppBootstrap(
-      builder: (context, locale, lightTheme, darkTheme, themeMode) {
+    final payload = ref.watch(overlayAppPayloadProvider);
+    final locale = Locale(
+      payload.localeLanguageCode,
+      payload.localeCountryCode.isEmpty ? null : payload.localeCountryCode,
+    );
+    final lightTheme = _buildOverlayTheme(
+      AppTheme.lightTheme(Color(payload.primaryColorValue)),
+    );
+    final darkTheme = _buildOverlayTheme(
+      AppTheme.darkTheme(Color(payload.primaryColorValue)),
+    );
+
+    return ScreenUtilInit(
+      designSize: const Size(375, 812),
+      minTextAdapt: true,
+      splitScreenMode: true,
+      builder: (context, child) {
         return MaterialApp(
           title: 'JsxposedX Overlay',
           locale: locale,
@@ -17,9 +35,9 @@ class OverlaySubApp extends ConsumerWidget {
           supportedLocales: AppBootstrap.supportedLocales,
           localeResolutionCallback: (deviceLocale, supportedLocales) => locale,
           debugShowCheckedModeBanner: false,
-          theme: _buildOverlayTheme(lightTheme),
-          darkTheme: _buildOverlayTheme(darkTheme),
-          themeMode: themeMode,
+          theme: lightTheme,
+          darkTheme: darkTheme,
+          themeMode: payload.isDarkTheme ? ThemeMode.dark : ThemeMode.light,
           home: const OverlayWindowHostPage(),
         );
       },

@@ -22,6 +22,10 @@ void main() {
       expect(dto.toRaw(), <String, dynamic>{
         'sceneId': 7,
         'displayMode': OverlayWindowDisplayMode.panel,
+        'localeLanguageCode': 'zh',
+        'localeCountryCode': 'CN',
+        'isDarkTheme': false,
+        'primaryColorValue': 0xFF98D2D5,
       });
     });
 
@@ -32,6 +36,25 @@ void main() {
 
       expect(dto.sceneId, 5);
       expect(dto.displayMode, OverlayWindowDisplayMode.bubble);
+    });
+
+    test('parses theme and locale snapshot fields', () {
+      final dto = OverlayWindowPayloadDto.fromRaw(
+        <String, dynamic>{
+          'sceneId': 3,
+          'displayMode': OverlayWindowDisplayMode.bubble,
+          'localeLanguageCode': 'en',
+          'localeCountryCode': 'US',
+          'isDarkTheme': true,
+          'primaryColorValue': 0xFF123456,
+        },
+      );
+
+      expect(dto.localeLanguageCode, 'en');
+      expect(dto.localeCountryCode, 'US');
+      expect(dto.isDarkTheme, isTrue);
+      expect(dto.primaryColorValue, 0xFF123456);
+      expect(dto.toModel().isDarkTheme, isTrue);
     });
   });
 

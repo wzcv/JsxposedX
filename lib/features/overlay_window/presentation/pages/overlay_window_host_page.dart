@@ -11,6 +11,7 @@ import 'package:JsxposedX/features/overlay_window/domain/models/overlay_window_p
 import 'package:JsxposedX/features/overlay_window/domain/models/overlay_window_presentation.dart';
 import 'package:JsxposedX/features/overlay_window/domain/models/overlay_viewport_metrics_model.dart';
 import 'package:JsxposedX/features/overlay_window/presentation/models/overlay_scene_definition.dart';
+import 'package:JsxposedX/features/overlay_window/presentation/providers/overlay_app_payload_provider.dart';
 import 'package:JsxposedX/features/overlay_window/presentation/providers/overlay_scene_registry_provider.dart';
 import 'package:JsxposedX/features/overlay_window/presentation/providers/overlay_window_query_provider.dart';
 import 'package:JsxposedX/features/overlay_window/presentation/utils/overlay_window_geometry.dart';
@@ -43,6 +44,12 @@ class _OverlayWindowHostPageState extends ConsumerState<OverlayWindowHostPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _payload = OverlayWindowPayload(sceneId: _defaultSceneId());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      ref.read(overlayAppPayloadProvider.notifier).setPayload(_payload);
+    });
     _subscription = ref
         .read(overlayWindowQueryRepositoryProvider)
         .overlayEvents
@@ -104,6 +111,12 @@ class _OverlayWindowHostPageState extends ConsumerState<OverlayWindowHostPage>
 
     setState(() {
       _payload = nextPayload;
+    });
+    Future<void>.microtask(() {
+      if (!mounted) {
+        return;
+      }
+      ref.read(overlayAppPayloadProvider.notifier).setPayload(nextPayload);
     });
 
     if (nextPayload.isBubble && !_isTransitioningToPanel) {

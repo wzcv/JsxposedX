@@ -11,6 +11,8 @@ import 'package:JsxposedX/features/overlay_window/presentation/models/overlay_sc
 import 'package:JsxposedX/features/overlay_window/presentation/providers/overlay_scene_registry_provider.dart';
 import 'package:JsxposedX/features/overlay_window/presentation/providers/overlay_window_query_provider.dart';
 import 'package:JsxposedX/features/overlay_window/presentation/utils/overlay_window_geometry.dart';
+import 'package:JsxposedX/core/providers/locale_provider.dart';
+import 'package:JsxposedX/core/providers/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -94,7 +96,7 @@ class OverlayWindowAction extends _$OverlayWindowAction {
         bubbleLayout.position,
       );
       await ref.read(overlayWindowActionRepositoryProvider).sharePayload(
-            OverlayWindowPayload(
+            _buildPayload(
               sceneId: sceneId,
               displayMode: OverlayWindowDisplayMode.bubble,
             ),
@@ -134,7 +136,7 @@ class OverlayWindowAction extends _$OverlayWindowAction {
             ),
           );
       await ref.read(overlayWindowActionRepositoryProvider).sharePayload(
-            OverlayWindowPayload(
+            _buildPayload(
               sceneId: scene.sceneId,
               displayMode: OverlayWindowDisplayMode.panel,
             ),
@@ -186,7 +188,7 @@ class OverlayWindowAction extends _$OverlayWindowAction {
         bubbleLayout.position,
       );
       await ref.read(overlayWindowActionRepositoryProvider).sharePayload(
-            OverlayWindowPayload(
+            _buildPayload(
               sceneId: scene.sceneId,
               displayMode: OverlayWindowDisplayMode.bubble,
             ),
@@ -251,6 +253,22 @@ class OverlayWindowAction extends _$OverlayWindowAction {
       position: OverlayWindowGeometry.hostPositionFromVisualOffset(visualOffset),
       enableDrag: presentation.enableDrag,
       displayMode: OverlayWindowDisplayMode.bubble,
+    );
+  }
+
+  OverlayWindowPayload _buildPayload({
+    required int sceneId,
+    required String displayMode,
+  }) {
+    final locale = ref.read(localeProvider);
+    final theme = ref.read(themeProvider);
+    return OverlayWindowPayload(
+      sceneId: sceneId,
+      displayMode: displayMode,
+      localeLanguageCode: locale.languageCode,
+      localeCountryCode: locale.countryCode ?? '',
+      isDarkTheme: theme.brightness == Brightness.dark,
+      primaryColorValue: theme.colorScheme.primary.value,
     );
   }
 }
