@@ -9,27 +9,29 @@ class OverlayWindow extends StatelessWidget {
     super.key,
     required this.child,
     this.header,
+    this.leading,
     this.title,
     this.subtitle,
     this.onClose,
     this.onMinimize,
     this.onBackdropTap,
     this.footer,
-    this.margin = const EdgeInsets.all(20),
-    this.maxWidth = 560,
+    this.margin,
+    this.maxWidth,
     this.maxHeight,
   });
 
   final Widget child;
   final Widget? header;
+  final Widget? leading;
   final String? title;
   final String? subtitle;
   final VoidCallback? onClose;
   final VoidCallback? onMinimize;
   final VoidCallback? onBackdropTap;
   final Widget? footer;
-  final EdgeInsetsGeometry margin;
-  final double maxWidth;
+  final EdgeInsetsGeometry? margin;
+  final double? maxWidth;
   final double? maxHeight;
 
   @override
@@ -38,11 +40,17 @@ class OverlayWindow extends StatelessWidget {
     final hasHeader = resolvedHeader != null;
     final colorScheme = context.colorScheme;
     final backdropTapHandler = onBackdropTap ?? onMinimize ?? onClose;
+    final resolvedMargin = margin ?? EdgeInsets.all(20.r);
 
     return Material(
       color: Colors.transparent,
       child: LayoutBuilder(
         builder: (context, constraints) {
+          final shouldFillWidth = maxWidth == null;
+          final shouldFillHeight = maxHeight == null;
+          final resolvedMaxWidth = maxWidth == null
+              ? constraints.maxWidth
+              : math.min(maxWidth!, constraints.maxWidth);
           final resolvedMaxHeight = maxHeight == null
               ? constraints.maxHeight
               : math.min(maxHeight!, constraints.maxHeight);
@@ -57,11 +65,13 @@ class OverlayWindow extends StatelessWidget {
               ),
               SafeArea(
                 child: Padding(
-                  padding: margin,
+                  padding: resolvedMargin,
                   child: Center(
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
-                        maxWidth: maxWidth,
+                        minWidth: shouldFillWidth ? resolvedMaxWidth : 0,
+                        maxWidth: resolvedMaxWidth,
+                        minHeight: shouldFillHeight ? resolvedMaxHeight : 0,
                         maxHeight: resolvedMaxHeight,
                       ),
                       child: DecoratedBox(
@@ -141,20 +151,10 @@ class OverlayWindow extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Container(
-              width: 42.w,
-              height: 42.w,
-              decoration: BoxDecoration(
-                color: colorScheme.primary,
-                borderRadius: BorderRadius.circular(14.r),
-              ),
-              child: const Icon(
-                Icons.memory_rounded,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-            SizedBox(width: 12.w),
+            if (leading != null) ...<Widget>[
+              leading!,
+              SizedBox(width: 12.w),
+            ],
             Expanded(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -212,7 +212,9 @@ class _OverlayBackdrop extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(color: Color(0x990B1020)),
+      decoration: BoxDecoration(
+        color: context.colorScheme.scrim.withValues(alpha: 0.6),
+      ),
       child: const SizedBox.expand(),
     );
   }

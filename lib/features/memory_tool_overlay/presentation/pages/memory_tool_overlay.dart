@@ -11,6 +11,7 @@ class MemoryToolOverlay extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.max,
       children: <Widget>[
         Text(
           context.l10n.overlayQuickWorkspace,

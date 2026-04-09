@@ -10,42 +10,28 @@ import 'package:JsxposedX/features/overlay_window/presentation/providers/overlay
 import 'package:JsxposedX/features/overlay_window/presentation/providers/overlay_window_host_runtime_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-class OverlayWindowHostPage extends ConsumerStatefulWidget {
+class OverlayWindowHostPage extends HookConsumerWidget {
   const OverlayWindowHostPage({super.key});
 
   @override
-  ConsumerState<OverlayWindowHostPage> createState() =>
-      _OverlayWindowHostPageState();
-}
-
-class _OverlayWindowHostPageState extends ConsumerState<OverlayWindowHostPage>
-    with WidgetsBindingObserver {
-  static const double _panelMaxWidth = 560;
-  static const double _panelMaxHeight = 720;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeMetrics() {
-    unawaited(
-      ref.read(overlayWindowHostRuntimeProvider.notifier).onMetricsChanged(),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final controller = ref.read(overlayWindowHostRuntimeProvider.notifier);
+    final metricsObserver = useMemoized(
+      () => _OverlayMetricsObserver(
+        onMetricsChanged: () {
+          unawaited(controller.onMetricsChanged());
+        },
+      ),
+      <Object>[controller],
     );
-  }
+    useEffect(() {
+      WidgetsBinding.instance.addObserver(metricsObserver);
+      return () => WidgetsBinding.instance.removeObserver(metricsObserver);
+    }, <Object>[metricsObserver]);
 
-  @override
-  Widget build(BuildContext context) {
     final runtimeState = ref.watch(overlayWindowHostRuntimeProvider);
     final payload = runtimeState.payload;
 
@@ -54,88 +40,92 @@ class _OverlayWindowHostPageState extends ConsumerState<OverlayWindowHostPage>
       child: runtimeState.isTransitioningToPanel
           ? const SizedBox.expand()
           : payload.isPanel
-          ? _buildPanelWindow(context, payload.sceneId)
-          : _buildBubble(payload.sceneId),
+          ? _buildPanelWindow(context, ref, payload.sceneId)
+          : _buildBubble(ref, payload.sceneId),
     );
   }
+}
 
-  OverlaySceneDefinition? _scene(int sceneId) {
-    return ref.read(overlaySceneRegistryProvider)[sceneId];
+class _OverlayMetricsObserver with WidgetsBindingObserver {
+  _OverlayMetricsObserver({required this.onMetricsChanged});
+
+  final VoidCallback onMetricsChanged;
+
+  @override
+  void didChangeMetrics() {
+    onMetricsChanged();
   }
+}
 
-  Widget _buildPanelWindow(BuildContext context, int sceneId) {
-    final scene = _scene(sceneId);
-    final controller = ref.read(overlayWindowHostRuntimeProvider.notifier);
-    final title =
-        scene?.title(context) ?? context.l10n.overlayWindowFallbackTitle;
-    final subtitle =
-        scene?.subtitle?.call(context) ??
-        context.l10n.overlayFloatingToolWindow;
+OverlaySceneDefinition? _scene(WidgetRef ref, int sceneId) {
+  return ref.read(overlaySceneRegistryProvider)[sceneId];
+}
 
-    return OverlayWindow(
-      title: title,
-      subtitle: subtitle,
-      onBackdropTap: () =>
-          controller.setDisplayMode(OverlayWindowDisplayMode.bubble),
-      onMinimize: () =>
-          controller.setDisplayMode(OverlayWindowDisplayMode.bubble),
-      onClose: () {
-        unawaited(controller.closeOverlay());
-      },
-      maxWidth: _panelMaxWidth,
-      maxHeight: _panelMaxHeight,
-      child: scene?.panelBuilder(context) ?? _buildUnknownScene(context),
-    );
-  }
+Widget _buildPanelWindow(BuildContext context, WidgetRef ref, int sceneId) {
+  final scene = _scene(ref, sceneId);
+  final controller = ref.read(overlayWindowHostRuntimeProvider.notifier);
+  final title = scene?.title(context) ?? context.l10n.overlayWindowFallbackTitle;
+  final subtitle =
+      scene?.subtitle?.call(context) ?? context.l10n.overlayFloatingToolWindow;
 
-  Widget _buildBubble(int sceneId) {
-    return SizedBox.expand(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: OverlayBubble(size: _bubbleSizeForScene(sceneId)),
+  return OverlayWindow(
+    title: title,
+    subtitle: subtitle,
+    onBackdropTap: () => controller.setDisplayMode(OverlayWindowDisplayMode.bubble),
+    onMinimize: () => controller.setDisplayMode(OverlayWindowDisplayMode.bubble),
+    onClose: () {
+      unawaited(controller.closeOverlay());
+    },
+    margin: scene?.panelMargin?.call(context),
+    maxWidth: scene?.panelMaxWidth?.call(context),
+    maxHeight: scene?.panelMaxHeight?.call(context),
+    child: scene?.panelBuilder(context) ?? _buildUnknownScene(context, ref),
+  );
+}
+
+Widget _buildBubble(WidgetRef ref, int sceneId) {
+  return SizedBox.expand(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: OverlayBubble(size: _bubbleSizeForScene(ref, sceneId)),
+    ),
+  );
+}
+
+Widget _buildUnknownScene(BuildContext context, WidgetRef ref) {
+  return Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: <Widget>[
+      Text(
+        context.l10n.overlayWindowUnknownSceneTitle,
+        style: context.textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w700,
+        ),
       ),
-    );
-  }
+      SizedBox(height: 8.h),
+      Text(
+        context.l10n.overlayWindowUnknownSceneDescription,
+        style: context.textTheme.bodyMedium?.copyWith(
+          color: context.colorScheme.onSurfaceVariant,
+          height: 1.45,
+        ),
+      ),
+      SizedBox(height: 16.h),
+      Align(
+        alignment: Alignment.centerRight,
+        child: FilledButton(
+          onPressed: () {
+            unawaited(ref.read(overlayWindowHostRuntimeProvider.notifier).closeOverlay());
+          },
+          child: Text(context.l10n.close),
+        ),
+      ),
+    ],
+  );
+}
 
-  Widget _buildUnknownScene(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          context.l10n.overlayWindowUnknownSceneTitle,
-          style: context.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        SizedBox(height: 8.h),
-        Text(
-          context.l10n.overlayWindowUnknownSceneDescription,
-          style: context.textTheme.bodyMedium?.copyWith(
-            color: context.colorScheme.onSurfaceVariant,
-            height: 1.45,
-          ),
-        ),
-        SizedBox(height: 16.h),
-        Align(
-          alignment: Alignment.centerRight,
-          child: FilledButton(
-            onPressed: () {
-              unawaited(
-                ref
-                    .read(overlayWindowHostRuntimeProvider.notifier)
-                    .closeOverlay(),
-              );
-            },
-            child: Text(context.l10n.close),
-          ),
-        ),
-      ],
-    );
-  }
-
-  double _bubbleSizeForScene(int sceneId) {
-    return _scene(sceneId)?.bubbleSize ??
-        OverlayWindowPresentation.defaultBubbleSize;
-  }
+double _bubbleSizeForScene(WidgetRef ref, int sceneId) {
+  return _scene(ref, sceneId)?.bubbleSize ??
+      OverlayWindowPresentation.defaultBubbleSize;
 }
