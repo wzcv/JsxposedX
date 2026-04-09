@@ -1,23 +1,27 @@
 import 'package:JsxposedX/features/overlay_window/domain/models/overlay_window_payload.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-class OverlayWindowPayloadDto {
-  const OverlayWindowPayloadDto({
-    required this.sceneId,
-    required this.displayMode,
-    required this.localeLanguageCode,
-    required this.localeCountryCode,
-    required this.isDarkTheme,
-    required this.primaryColorValue,
-  });
+part 'overlay_window_payload_dto.freezed.dart';
+part 'overlay_window_payload_dto.g.dart';
 
-  final int sceneId;
-  final String displayMode;
-  final String localeLanguageCode;
-  final String localeCountryCode;
-  final bool isDarkTheme;
-  final int primaryColorValue;
+@freezed
+abstract class OverlayWindowPayloadDto with _$OverlayWindowPayloadDto {
+  const OverlayWindowPayloadDto._();
 
-  OverlayWindowPayload toModel() {
+  const factory OverlayWindowPayloadDto({
+    @Default(0) int sceneId,
+    @Default(OverlayWindowDisplayMode.bubble)
+    OverlayWindowDisplayMode displayMode,
+    @Default('zh') String localeLanguageCode,
+    @Default('CN') String localeCountryCode,
+    @Default(false) bool isDarkTheme,
+    @Default(0xFF98D2D5) int primaryColorValue,
+  }) = _OverlayWindowPayloadDto;
+
+  factory OverlayWindowPayloadDto.fromJson(Map<String, dynamic> json) =>
+      _$OverlayWindowPayloadDtoFromJson(json);
+
+  OverlayWindowPayload toEntity() {
     return OverlayWindowPayload(
       sceneId: sceneId,
       displayMode: displayMode,
@@ -31,7 +35,7 @@ class OverlayWindowPayloadDto {
   Map<String, dynamic> toRaw() {
     return <String, dynamic>{
       'sceneId': sceneId,
-      'displayMode': displayMode,
+      'displayMode': displayMode.name,
       'localeLanguageCode': localeLanguageCode,
       'localeCountryCode': localeCountryCode,
       'isDarkTheme': isDarkTheme,
@@ -39,94 +43,75 @@ class OverlayWindowPayloadDto {
     };
   }
 
-  factory OverlayWindowPayloadDto.fromModel(OverlayWindowPayload payload) {
-    return OverlayWindowPayloadDto(
-      sceneId: payload.sceneId,
-      displayMode: payload.displayMode,
-      localeLanguageCode: payload.localeLanguageCode,
-      localeCountryCode: payload.localeCountryCode,
-      isDarkTheme: payload.isDarkTheme,
-      primaryColorValue: payload.primaryColorValue,
-    );
-  }
-
-  factory OverlayWindowPayloadDto.fromRaw(dynamic raw) {
-    if (raw is OverlayWindowPayload) {
-      return OverlayWindowPayloadDto.fromModel(raw);
+  static OverlayWindowPayloadDto? maybeFromRaw(dynamic raw) {
+    if (raw is OverlayWindowPayloadDto) {
+      return raw;
     }
 
     if (raw is int) {
-      return OverlayWindowPayloadDto(
-        sceneId: raw,
-        displayMode: OverlayWindowDisplayMode.bubble,
-        localeLanguageCode: 'zh',
-        localeCountryCode: 'CN',
-        isDarkTheme: false,
-        primaryColorValue: 0xFF98D2D5,
-      );
+      return OverlayWindowPayloadDto(sceneId: raw);
     }
 
     if (raw is String) {
       final parsedScene = int.tryParse(raw);
-      if (parsedScene != null) {
-        return OverlayWindowPayloadDto(
-          sceneId: parsedScene,
-          displayMode: OverlayWindowDisplayMode.bubble,
-          localeLanguageCode: 'zh',
-          localeCountryCode: 'CN',
-          isDarkTheme: false,
-          primaryColorValue: 0xFF98D2D5,
-        );
+      if (parsedScene == null) {
+        return null;
       }
+      return OverlayWindowPayloadDto(sceneId: parsedScene);
     }
 
-    if (raw is Map) {
-      final normalized = raw.map(
-        (Object? key, Object? value) => MapEntry(key.toString(), value),
-      );
-      final sceneValue = normalized['sceneId'] ?? normalized['scene'];
-      final parsedScene = switch (sceneValue) {
-        int value => value,
-        String value => int.tryParse(value),
-        _ => null,
-      };
-      if (parsedScene != null) {
-        final rawDisplayMode = normalized['displayMode']?.toString();
-        final rawLanguageCode =
-            normalized['localeLanguageCode']?.toString() ?? 'zh';
-        final rawCountryCode =
-            normalized['localeCountryCode']?.toString() ?? 'CN';
-        final rawIsDarkTheme = switch (normalized['isDarkTheme']) {
-          bool value => value,
-          String value => value.toLowerCase() == 'true',
-          int value => value != 0,
-          _ => false,
-        };
-        final rawPrimaryColorValue = switch (normalized['primaryColorValue']) {
-          int value => value,
-          String value => int.tryParse(value) ?? 0xFF98D2D5,
-          _ => 0xFF98D2D5,
-        };
-        return OverlayWindowPayloadDto(
-          sceneId: parsedScene,
-          displayMode: rawDisplayMode == OverlayWindowDisplayMode.panel
-              ? OverlayWindowDisplayMode.panel
-              : OverlayWindowDisplayMode.bubble,
-          localeLanguageCode: rawLanguageCode,
-          localeCountryCode: rawCountryCode,
-          isDarkTheme: rawIsDarkTheme,
-          primaryColorValue: rawPrimaryColorValue,
-        );
-      }
+    if (raw is! Map) {
+      return null;
     }
 
-    return const OverlayWindowPayloadDto(
-      sceneId: 0,
-      displayMode: OverlayWindowDisplayMode.bubble,
-      localeLanguageCode: 'zh',
-      localeCountryCode: 'CN',
-      isDarkTheme: false,
-      primaryColorValue: 0xFF98D2D5,
+    final normalized = raw.map(
+      (Object? key, Object? value) => MapEntry(key.toString(), value),
     );
+    final sceneValue = normalized['sceneId'] ?? normalized['scene'];
+    final parsedScene = switch (sceneValue) {
+      int value => value,
+      String value => int.tryParse(value),
+      _ => null,
+    };
+    if (parsedScene == null) {
+      return null;
+    }
+
+    return OverlayWindowPayloadDto(
+      sceneId: parsedScene,
+      displayMode: _displayModeFromRaw(normalized['displayMode']),
+      localeLanguageCode: normalized['localeLanguageCode']?.toString() ?? 'zh',
+      localeCountryCode: normalized['localeCountryCode']?.toString() ?? 'CN',
+      isDarkTheme: _boolFromRaw(normalized['isDarkTheme']) ?? false,
+      primaryColorValue:
+          _intFromRaw(normalized['primaryColorValue']) ?? 0xFF98D2D5,
+    );
+  }
+
+  factory OverlayWindowPayloadDto.fromRaw(dynamic raw) {
+    return maybeFromRaw(raw) ?? const OverlayWindowPayloadDto();
+  }
+
+  static OverlayWindowDisplayMode _displayModeFromRaw(Object? raw) {
+    return raw?.toString() == OverlayWindowDisplayMode.panel.name
+        ? OverlayWindowDisplayMode.panel
+        : OverlayWindowDisplayMode.bubble;
+  }
+
+  static bool? _boolFromRaw(Object? raw) {
+    return switch (raw) {
+      bool value => value,
+      String value => value.toLowerCase() == 'true',
+      int value => value != 0,
+      _ => null,
+    };
+  }
+
+  static int? _intFromRaw(Object? raw) {
+    return switch (raw) {
+      int value => value,
+      String value => int.tryParse(value),
+      _ => null,
+    };
   }
 }

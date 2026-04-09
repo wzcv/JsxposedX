@@ -1,6 +1,6 @@
 import 'dart:ui';
 
-import 'package:JsxposedX/features/overlay_window/domain/models/overlay_viewport_metrics_model.dart';
+import 'package:JsxposedX/features/overlay_window/domain/models/overlay_viewport_metrics.dart';
 
 class OverlayWindowGeometry {
   const OverlayWindowGeometry._();
@@ -27,7 +27,7 @@ class OverlayWindowGeometry {
   }
 
   static Offset defaultBubbleVisualOffset({
-    required OverlayViewportMetricsModel viewport,
+    required OverlayViewportMetrics viewport,
     required double bubbleSize,
   }) {
     final bounds = bubbleBounds(viewport: viewport, bubbleSize: bubbleSize);
@@ -37,7 +37,7 @@ class OverlayWindowGeometry {
 
   static Offset clampBubbleVisualOffset(
     Offset offset, {
-    required OverlayViewportMetricsModel viewport,
+    required OverlayViewportMetrics viewport,
     required double bubbleSize,
   }) {
     final bounds = bubbleBounds(viewport: viewport, bubbleSize: bubbleSize);
@@ -49,7 +49,7 @@ class OverlayWindowGeometry {
 
   static Offset snapBubbleVisualOffset(
     Offset offset, {
-    required OverlayViewportMetricsModel viewport,
+    required OverlayViewportMetrics viewport,
     required double bubbleSize,
   }) {
     final bounds = bubbleBounds(viewport: viewport, bubbleSize: bubbleSize);
@@ -64,7 +64,7 @@ class OverlayWindowGeometry {
   }
 
   static OverlayBubbleBounds bubbleBounds({
-    required OverlayViewportMetricsModel viewport,
+    required OverlayViewportMetrics viewport,
     required double bubbleSize,
   }) {
     final safePadding = viewport.safePadding;

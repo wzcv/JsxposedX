@@ -1,12 +1,12 @@
 import 'dart:ui';
 
-import 'package:JsxposedX/features/overlay_window/domain/models/overlay_viewport_metrics_model.dart';
+import 'package:JsxposedX/features/overlay_window/domain/models/overlay_viewport_metrics.dart';
 import 'package:JsxposedX/features/overlay_window/presentation/utils/overlay_window_geometry.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  const viewport = OverlayViewportMetricsModel(
+  const viewport = OverlayViewportMetrics(
     width: 400,
     height: 800,
     safePadding: EdgeInsets.fromLTRB(10, 20, 10, 30),

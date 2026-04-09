@@ -2,8 +2,9 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:JsxposedX/features/overlay_window/domain/models/overlay_host_layout.dart';
-import 'package:JsxposedX/features/overlay_window/domain/models/overlay_viewport_metrics_model.dart';
+import 'package:JsxposedX/features/overlay_window/domain/models/overlay_viewport_metrics.dart';
 import 'package:JsxposedX/features/overlay_window/domain/models/overlay_window_payload.dart';
+import 'package:JsxposedX/features/overlay_window/domain/models/overlay_window_runtime_message.dart';
 import 'package:JsxposedX/features/overlay_window/domain/models/overlay_window_status.dart';
 import 'package:JsxposedX/features/overlay_window/domain/repositories/overlay_window_action_repository.dart';
 import 'package:JsxposedX/features/overlay_window/domain/repositories/overlay_window_query_repository.dart';
@@ -26,7 +27,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          overlayWindowQueryRepositoryProvider.overrideWithValue(queryRepository),
+          overlayWindowQueryRepositoryProvider.overrideWithValue(
+            queryRepository,
+          ),
           overlayWindowActionRepositoryProvider.overrideWithValue(
             actionRepository,
           ),
@@ -48,10 +51,16 @@ void main() {
     );
 
     queryRepository.controller.add(
-      <String, dynamic>{
-        'sceneId': 999,
-        'displayMode': OverlayWindowDisplayMode.panel,
-      },
+      OverlayWindowRuntimeMessage.payload(
+        OverlayWindowPayload(
+          sceneId: 999,
+          displayMode: OverlayWindowDisplayMode.panel,
+          localeLanguageCode: 'en',
+          localeCountryCode: 'US',
+          isDarkTheme: true,
+          primaryColorValue: 0xFF123456,
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -65,18 +74,20 @@ void main() {
   });
 }
 
-class _FakeOverlayWindowQueryRepository implements OverlayWindowQueryRepository {
-  final StreamController<dynamic> controller = StreamController<dynamic>.broadcast();
+class _FakeOverlayWindowQueryRepository
+    implements OverlayWindowQueryRepository {
+  final StreamController<OverlayWindowRuntimeMessage> controller =
+      StreamController<OverlayWindowRuntimeMessage>.broadcast();
 
   @override
   bool get isSupportedPlatform => true;
 
   @override
-  Stream<dynamic> get overlayEvents => controller.stream;
+  Stream<OverlayWindowRuntimeMessage> get overlayEvents => controller.stream;
 
   @override
-  Future<OverlayViewportMetricsModel> getOverlayViewportMetrics() async {
-    return const OverlayViewportMetricsModel(
+  Future<OverlayViewportMetrics> getOverlayViewportMetrics() async {
+    return const OverlayViewportMetrics(
       width: 400,
       height: 800,
       safePadding: EdgeInsets.zero,
@@ -102,7 +113,8 @@ class _FakeOverlayWindowQueryRepository implements OverlayWindowQueryRepository 
   Future<bool> isPermissionGranted() async => true;
 }
 
-class _FakeOverlayWindowActionRepository implements OverlayWindowActionRepository {
+class _FakeOverlayWindowActionRepository
+    implements OverlayWindowActionRepository {
   @override
   Future<bool> closeOverlay() async => true;
 

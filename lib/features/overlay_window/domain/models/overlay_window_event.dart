@@ -1,18 +1,19 @@
 import 'dart:ui';
 
-class OverlayWindowEventType {
-  static const String bubbleTap = 'bubbleTap';
-  static const String bubbleDragEnd = 'bubbleDragEnd';
-}
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-class OverlayWindowEvent {
-  const OverlayWindowEvent({
-    required this.type,
-    this.hostPosition,
-  });
+part 'overlay_window_event.freezed.dart';
 
-  final String type;
-  final Offset? hostPosition;
+enum OverlayWindowEventType { bubbleTap, bubbleDragEnd }
+
+@freezed
+abstract class OverlayWindowEvent with _$OverlayWindowEvent {
+  const OverlayWindowEvent._();
+
+  const factory OverlayWindowEvent({
+    required OverlayWindowEventType type,
+    Offset? hostPosition,
+  }) = _OverlayWindowEvent;
 
   bool get isBubbleTap => type == OverlayWindowEventType.bubbleTap;
   bool get isBubbleDragEnd => type == OverlayWindowEventType.bubbleDragEnd;

@@ -1,13 +1,16 @@
-class OverlayWindowStatus {
-  const OverlayWindowStatus({
-    required this.isSupported,
-    required this.hasPermission,
-    required this.isActive,
-  });
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-  final bool isSupported;
-  final bool hasPermission;
-  final bool isActive;
+part 'overlay_window_status.freezed.dart';
+
+@freezed
+abstract class OverlayWindowStatus with _$OverlayWindowStatus {
+  const OverlayWindowStatus._();
+
+  const factory OverlayWindowStatus({
+    required bool isSupported,
+    required bool hasPermission,
+    required bool isActive,
+  }) = _OverlayWindowStatus;
 
   bool get canShow => isSupported && hasPermission;
 }

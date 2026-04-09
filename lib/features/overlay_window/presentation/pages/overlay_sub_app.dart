@@ -1,7 +1,7 @@
 import 'package:JsxposedX/common/widgets/app_bootstrap.dart';
 import 'package:JsxposedX/core/themes/app_theme.dart';
-import 'package:JsxposedX/features/overlay_window/presentation/providers/overlay_app_payload_provider.dart';
 import 'package:JsxposedX/features/overlay_window/presentation/pages/overlay_window_host_page.dart';
+import 'package:JsxposedX/features/overlay_window/presentation/providers/overlay_window_host_runtime_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -11,7 +11,9 @@ class OverlaySubApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final payload = ref.watch(overlayAppPayloadProvider);
+    final payload = ref.watch(
+      overlayWindowHostRuntimeProvider.select((state) => state.payload),
+    );
     final locale = Locale(
       payload.localeLanguageCode,
       payload.localeCountryCode.isEmpty ? null : payload.localeCountryCode,

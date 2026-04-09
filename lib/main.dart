@@ -27,10 +27,14 @@ class MainApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen(localeProvider, (_, __) {
-      unawaited(ref.read(overlayWindowActionProvider.notifier).syncEnvironment());
+      unawaited(
+        ref.read(overlayWindowActionProvider.notifier).syncEnvironment(),
+      );
     });
     ref.listen(themeProvider, (_, __) {
-      unawaited(ref.read(overlayWindowActionProvider.notifier).syncEnvironment());
+      unawaited(
+        ref.read(overlayWindowActionProvider.notifier).syncEnvironment(),
+      );
     });
     final router = ref.watch(appRouterProvider);
 

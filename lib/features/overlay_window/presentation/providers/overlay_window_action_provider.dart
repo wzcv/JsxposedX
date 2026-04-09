@@ -1,9 +1,6 @@
-import 'dart:async';
 import 'dart:ui';
 
 import 'package:JsxposedX/features/overlay_window/data/datasources/overlay_window_action_datasource.dart';
-import 'package:JsxposedX/features/overlay_window/data/models/overlay_window_event_dto.dart';
-import 'package:JsxposedX/features/overlay_window/data/models/overlay_window_payload_dto.dart';
 import 'package:JsxposedX/features/overlay_window/data/repositories/overlay_window_action_repository_impl.dart';
 import 'package:JsxposedX/features/overlay_window/domain/models/overlay_host_layout.dart';
 import 'package:JsxposedX/features/overlay_window/domain/models/overlay_window_payload.dart';
@@ -13,11 +10,11 @@ import 'package:JsxposedX/features/overlay_window/domain/repositories/overlay_wi
 import 'package:JsxposedX/features/overlay_window/presentation/models/overlay_scene_definition.dart';
 import 'package:JsxposedX/features/overlay_window/presentation/providers/overlay_scene_registry_provider.dart';
 import 'package:JsxposedX/features/overlay_window/presentation/providers/overlay_window_query_provider.dart';
+import 'package:JsxposedX/features/overlay_window/presentation/providers/overlay_window_runtime_sync_provider.dart';
 import 'package:JsxposedX/features/overlay_window/presentation/utils/overlay_window_geometry.dart';
 import 'package:JsxposedX/core/providers/locale_provider.dart';
 import 'package:JsxposedX/core/providers/theme_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'overlay_window_action_provider.g.dart';
@@ -37,27 +34,14 @@ OverlayWindowActionRepository overlayWindowActionRepository(Ref ref) {
 @Riverpod(keepAlive: true)
 class OverlayWindowAction extends _$OverlayWindowAction {
   Offset? _lastBubbleVisualOffset;
-  StreamSubscription<dynamic>? _overlaySubscription;
-  OverlayWindowPayload? _currentPayload;
 
   @override
-  AsyncValue<void> build() {
-    _overlaySubscription ??= ref
-        .read(overlayWindowQueryRepositoryProvider)
-        .overlayEvents
-        .listen(_handleOverlayMessage);
-    ref.onDispose(() async {
-      await _overlaySubscription?.cancel();
-      _overlaySubscription = null;
-    });
-    return const AsyncValue.data(null);
-  }
+  AsyncValue<void> build() => const AsyncValue.data(null);
 
   Future<OverlayWindowStatus> show(
     BuildContext context, {
     required int sceneId,
-    OverlayWindowPresentation presentation =
-        const OverlayWindowPresentation(),
+    OverlayWindowPresentation presentation = const OverlayWindowPresentation(),
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -73,7 +57,9 @@ class OverlayWindowAction extends _$OverlayWindowAction {
       }
 
       if (!currentStatus.hasPermission) {
-        await ref.read(overlayWindowActionRepositoryProvider).requestPermission();
+        await ref
+            .read(overlayWindowActionRepositoryProvider)
+            .requestPermission();
         currentStatus = await _refreshStatus();
         if (!currentStatus.hasPermission) {
           return currentStatus;
@@ -87,7 +73,8 @@ class OverlayWindowAction extends _$OverlayWindowAction {
         enableDrag: presentation.enableDrag,
         notificationTitle:
             presentation.notificationTitle ?? scene.notificationTitle(context),
-        notificationContent: presentation.notificationContent ??
+        notificationContent:
+            presentation.notificationContent ??
             scene.notificationContent(context),
       );
       final bubbleLayout = await _resolveBubbleLayout(
@@ -96,26 +83,33 @@ class OverlayWindowAction extends _$OverlayWindowAction {
       );
 
       if (currentStatus.isActive) {
-        await ref.read(overlayWindowActionRepositoryProvider).updateOverlayHost(
-              bubbleLayout,
-            );
+        await ref
+            .read(overlayWindowActionRepositoryProvider)
+            .updateOverlayHost(bubbleLayout);
       } else {
-        await ref.read(overlayWindowActionRepositoryProvider).showOverlayHost(
+        await ref
+            .read(overlayWindowActionRepositoryProvider)
+            .showOverlayHost(
               layout: bubbleLayout,
               notificationTitle: resolvedPresentation.notificationTitle!,
               notificationContent: resolvedPresentation.notificationContent!,
             );
       }
 
-      _lastBubbleVisualOffset = OverlayWindowGeometry.visualOffsetFromHostPosition(
-        bubbleLayout.position,
-      );
+      _lastBubbleVisualOffset =
+          OverlayWindowGeometry.visualOffsetFromHostPosition(
+            bubbleLayout.position,
+          );
       final payload = _buildPayload(
         sceneId: sceneId,
         displayMode: OverlayWindowDisplayMode.bubble,
       );
-      _currentPayload = payload;
-      await ref.read(overlayWindowActionRepositoryProvider).sharePayload(payload);
+      await ref
+          .read(overlayWindowActionRepositoryProvider)
+          .sharePayload(payload);
+      ref
+          .read(overlayWindowRuntimeSyncProvider.notifier)
+          .rememberPayload(payload);
       return await _refreshStatus();
     } catch (error, stackTrace) {
       state = AsyncValue.error(error, stackTrace);
@@ -141,21 +135,19 @@ class OverlayWindowAction extends _$OverlayWindowAction {
         return currentStatus;
       }
 
-      await ref.read(overlayWindowActionRepositoryProvider).updateOverlayHost(
-            const OverlayHostLayout(
-              width: WindowSize.matchParent,
-              height: WindowSize.fullCover,
-              position: Offset.zero,
-              enableDrag: false,
-              displayMode: OverlayWindowDisplayMode.panel,
-            ),
-          );
+      await ref
+          .read(overlayWindowActionRepositoryProvider)
+          .updateOverlayHost(OverlayHostLayout.panel());
       final payload = _buildPayload(
         sceneId: scene.sceneId,
         displayMode: OverlayWindowDisplayMode.panel,
       );
-      _currentPayload = payload;
-      await ref.read(overlayWindowActionRepositoryProvider).sharePayload(payload);
+      await ref
+          .read(overlayWindowActionRepositoryProvider)
+          .sharePayload(payload);
+      ref
+          .read(overlayWindowRuntimeSyncProvider.notifier)
+          .rememberPayload(payload);
       return await _refreshStatus();
     } catch (error, stackTrace) {
       state = AsyncValue.error(error, stackTrace);
@@ -169,8 +161,7 @@ class OverlayWindowAction extends _$OverlayWindowAction {
 
   Future<OverlayWindowStatus> collapse({
     required int sceneId,
-    OverlayWindowPresentation presentation =
-        const OverlayWindowPresentation(),
+    OverlayWindowPresentation presentation = const OverlayWindowPresentation(),
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -196,18 +187,23 @@ class OverlayWindowAction extends _$OverlayWindowAction {
           notificationContent: presentation.notificationContent,
         ),
       );
-      await ref.read(overlayWindowActionRepositoryProvider).updateOverlayHost(
-            bubbleLayout,
+      await ref
+          .read(overlayWindowActionRepositoryProvider)
+          .updateOverlayHost(bubbleLayout);
+      _lastBubbleVisualOffset =
+          OverlayWindowGeometry.visualOffsetFromHostPosition(
+            bubbleLayout.position,
           );
-      _lastBubbleVisualOffset = OverlayWindowGeometry.visualOffsetFromHostPosition(
-        bubbleLayout.position,
-      );
       final payload = _buildPayload(
         sceneId: scene.sceneId,
         displayMode: OverlayWindowDisplayMode.bubble,
       );
-      _currentPayload = payload;
-      await ref.read(overlayWindowActionRepositoryProvider).sharePayload(payload);
+      await ref
+          .read(overlayWindowActionRepositoryProvider)
+          .sharePayload(payload);
+      ref
+          .read(overlayWindowRuntimeSyncProvider.notifier)
+          .rememberPayload(payload);
       return await _refreshStatus();
     } catch (error, stackTrace) {
       state = AsyncValue.error(error, stackTrace);
@@ -223,7 +219,7 @@ class OverlayWindowAction extends _$OverlayWindowAction {
     state = const AsyncValue.loading();
     try {
       await ref.read(overlayWindowActionRepositoryProvider).closeOverlay();
-      _currentPayload = null;
+      ref.read(overlayWindowRuntimeSyncProvider.notifier).clear();
       return await _refreshStatus();
     } catch (error, stackTrace) {
       state = AsyncValue.error(error, stackTrace);
@@ -236,7 +232,7 @@ class OverlayWindowAction extends _$OverlayWindowAction {
   }
 
   Future<void> syncEnvironment() async {
-    final currentPayload = _currentPayload;
+    final currentPayload = ref.read(overlayWindowRuntimeSyncProvider);
     if (currentPayload == null) {
       return;
     }
@@ -254,21 +250,16 @@ class OverlayWindowAction extends _$OverlayWindowAction {
       return;
     }
 
-    _currentPayload = syncedPayload;
     await ref
         .read(overlayWindowActionRepositoryProvider)
         .sharePayload(syncedPayload);
+    ref
+        .read(overlayWindowRuntimeSyncProvider.notifier)
+        .rememberPayload(syncedPayload);
   }
 
   OverlaySceneDefinition? _readScene(int sceneId) {
     return ref.read(overlaySceneRegistryProvider)[sceneId];
-  }
-
-  void _handleOverlayMessage(dynamic rawMessage) {
-    if (OverlayWindowEventDto.maybeFromRaw(rawMessage) != null) {
-      return;
-    }
-    _currentPayload = OverlayWindowPayloadDto.fromRaw(rawMessage).toModel();
   }
 
   Future<OverlayWindowStatus> _refreshStatus() {
@@ -298,7 +289,9 @@ class OverlayWindowAction extends _$OverlayWindowAction {
     return OverlayHostLayout(
       width: (presentation.width ?? bubbleHostExtent).round(),
       height: (presentation.height ?? bubbleHostExtent).round(),
-      position: OverlayWindowGeometry.hostPositionFromVisualOffset(visualOffset),
+      position: OverlayWindowGeometry.hostPositionFromVisualOffset(
+        visualOffset,
+      ),
       enableDrag: presentation.enableDrag,
       displayMode: OverlayWindowDisplayMode.bubble,
     );
@@ -306,7 +299,7 @@ class OverlayWindowAction extends _$OverlayWindowAction {
 
   OverlayWindowPayload _buildPayload({
     required int sceneId,
-    required String displayMode,
+    required OverlayWindowDisplayMode displayMode,
   }) {
     final locale = ref.read(localeProvider);
     final theme = ref.read(themeProvider);

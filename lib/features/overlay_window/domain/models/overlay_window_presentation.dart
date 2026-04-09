@@ -1,19 +1,21 @@
-class OverlayWindowPresentation {
-  const OverlayWindowPresentation({
-    this.width,
-    this.height,
-    this.bubbleSize = defaultBubbleSize,
-    this.enableDrag = true,
-    this.notificationTitle,
-    this.notificationContent,
-  });
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-  static const double defaultBubbleSize = 58;
+part 'overlay_window_presentation.freezed.dart';
 
-  final double? width;
-  final double? height;
-  final double bubbleSize;
-  final bool enableDrag;
-  final String? notificationTitle;
-  final String? notificationContent;
+const double overlayWindowDefaultBubbleSize = 58;
+
+@freezed
+abstract class OverlayWindowPresentation with _$OverlayWindowPresentation {
+  const OverlayWindowPresentation._();
+
+  const factory OverlayWindowPresentation({
+    double? width,
+    double? height,
+    @Default(overlayWindowDefaultBubbleSize) double bubbleSize,
+    @Default(true) bool enableDrag,
+    String? notificationTitle,
+    String? notificationContent,
+  }) = _OverlayWindowPresentation;
+
+  static const double defaultBubbleSize = overlayWindowDefaultBubbleSize;
 }

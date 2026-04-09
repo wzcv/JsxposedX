@@ -2,7 +2,10 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:JsxposedX/features/overlay_window/data/datasources/overlay_window_query_datasource.dart';
-import 'package:JsxposedX/features/overlay_window/domain/models/overlay_viewport_metrics_model.dart';
+import 'package:JsxposedX/features/overlay_window/data/models/overlay_window_event_dto.dart';
+import 'package:JsxposedX/features/overlay_window/data/models/overlay_window_payload_dto.dart';
+import 'package:JsxposedX/features/overlay_window/domain/models/overlay_viewport_metrics.dart';
+import 'package:JsxposedX/features/overlay_window/domain/models/overlay_window_runtime_message.dart';
 import 'package:JsxposedX/features/overlay_window/domain/models/overlay_window_status.dart';
 import 'package:JsxposedX/features/overlay_window/domain/repositories/overlay_window_query_repository.dart';
 import 'package:flutter/foundation.dart';
@@ -19,7 +22,14 @@ class OverlayWindowQueryRepositoryImpl implements OverlayWindowQueryRepository {
   bool get isSupportedPlatform => !kIsWeb && Platform.isAndroid;
 
   @override
-  Stream<dynamic> get overlayEvents => _dataSource.overlayEvents;
+  Stream<OverlayWindowRuntimeMessage> get overlayEvents async* {
+    await for (final rawMessage in _dataSource.overlayEvents) {
+      final runtimeMessage = _mapRuntimeMessage(rawMessage);
+      if (runtimeMessage != null) {
+        yield runtimeMessage;
+      }
+    }
+  }
 
   @override
   Future<bool> isActive() async {
@@ -42,19 +52,20 @@ class OverlayWindowQueryRepositoryImpl implements OverlayWindowQueryRepository {
     if (!isSupportedPlatform) {
       return Offset.zero;
     }
-    return _dataSource.getOverlayPosition();
+    final position = await _dataSource.getOverlayPosition();
+    return Offset(position.x, position.y);
   }
 
   @override
-  Future<OverlayViewportMetricsModel> getOverlayViewportMetrics() async {
+  Future<OverlayViewportMetrics> getOverlayViewportMetrics() async {
     if (!isSupportedPlatform) {
-      return const OverlayViewportMetricsModel(
+      return const OverlayViewportMetrics(
         width: 0,
         height: 0,
         safePadding: EdgeInsets.zero,
       );
     }
-    return _dataSource.getOverlayViewportMetrics();
+    return (await _dataSource.getOverlayViewportMetrics()).toEntity();
   }
 
   @override
@@ -74,5 +85,19 @@ class OverlayWindowQueryRepositoryImpl implements OverlayWindowQueryRepository {
       hasPermission: hasPermission,
       isActive: active,
     );
+  }
+
+  OverlayWindowRuntimeMessage? _mapRuntimeMessage(dynamic rawMessage) {
+    final eventDto = OverlayWindowEventDto.maybeFromRaw(rawMessage);
+    if (eventDto != null) {
+      return OverlayWindowRuntimeMessage.event(eventDto.toEntity());
+    }
+
+    final payloadDto = OverlayWindowPayloadDto.maybeFromRaw(rawMessage);
+    if (payloadDto != null) {
+      return OverlayWindowRuntimeMessage.payload(payloadDto.toEntity());
+    }
+
+    return null;
   }
 }
