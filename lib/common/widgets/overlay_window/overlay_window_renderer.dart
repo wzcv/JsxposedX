@@ -50,16 +50,16 @@ class _OverlayWindowRendererState extends State<OverlayWindowRenderer> {
           final safePadding = MediaQuery.of(context).viewPadding;
           final bubbleSize = _bubbleSizeForScene(_payload.scene);
           final hostSize = Size(constraints.maxWidth, constraints.maxHeight);
+          final isFullscreenHost = _isFullscreenHost(
+            hostSize: hostSize,
+            bubbleSize: bubbleSize,
+          );
           _captureViewport(
             hostSize: hostSize,
             safePadding: safePadding,
             bubbleSize: bubbleSize,
           );
 
-          final viewport = _resolvedViewport(
-            hostSize: hostSize,
-            safePadding: safePadding,
-          );
           if (_payload.isBubble &&
               _needsBubbleHostSync &&
               _fullViewport != null) {
@@ -72,6 +72,9 @@ class _OverlayWindowRendererState extends State<OverlayWindowRenderer> {
           }
 
           if (_payload.isPanel) {
+            if (!isFullscreenHost) {
+              return const SizedBox.expand();
+            }
             return OverlayWindow(
               title: _resolveTitle(_payload.scene),
               subtitle: 'Floating tool window',
@@ -219,22 +222,15 @@ class _OverlayWindowRendererState extends State<OverlayWindowRenderer> {
     await FlutterOverlayWindow.updateFlag(overlayFlag);
   }
 
-  _OverlayViewport _resolvedViewport({
-    required Size hostSize,
-    required EdgeInsets safePadding,
-  }) {
-    return _fullViewport ??
-        _OverlayViewport(size: hostSize, safePadding: safePadding);
-  }
-
   void _captureViewport({
     required Size hostSize,
     required EdgeInsets safePadding,
     required double bubbleSize,
   }) {
-    final bubbleExtent = _bubbleHostExtent(bubbleSize);
-    final isFullscreenHost =
-        hostSize.width > bubbleExtent + 1 || hostSize.height > bubbleExtent + 1;
+    final isFullscreenHost = _isFullscreenHost(
+      hostSize: hostSize,
+      bubbleSize: bubbleSize,
+    );
     if (!isFullscreenHost) {
       return;
     }
@@ -255,6 +251,12 @@ class _OverlayWindowRendererState extends State<OverlayWindowRenderer> {
 
   double _bubbleHostExtent(double bubbleSize) {
     return bubbleSize + (_bubbleHostPadding * 2);
+  }
+
+  bool _isFullscreenHost({required Size hostSize, required double bubbleSize}) {
+    final bubbleExtent = _bubbleHostExtent(bubbleSize);
+    return hostSize.width > bubbleExtent + 1 ||
+        hostSize.height > bubbleExtent + 1;
   }
 
   Future<void> _moveBubbleHostToVisualOffset(Offset bubbleVisualOffset) async {

@@ -33,8 +33,8 @@ import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import io.flutter.embedding.android.FlutterTextureView;
 import io.flutter.embedding.android.FlutterView;
+import io.flutter.embedding.android.TransparencyMode;
 import io.flutter.FlutterInjector;
 import io.flutter.embedding.engine.FlutterEngine;
 import io.flutter.embedding.engine.FlutterEngineCache;
@@ -121,7 +121,7 @@ public class OverlayService extends Service implements View.OnTouchListener {
         Log.d("onStartCommand", "Service started");
         FlutterEngine engine = FlutterEngineCache.getInstance().get(OverlayConstants.CACHED_TAG);
         engine.getLifecycleChannel().appIsResumed();
-        flutterView = new FlutterView(getApplicationContext(), new FlutterTextureView(getApplicationContext()));
+        flutterView = new FlutterView(getApplicationContext(), TransparencyMode.transparent);
         flutterView.attachToFlutterEngine(FlutterEngineCache.getInstance().get(OverlayConstants.CACHED_TAG));
         flutterView.setFocusable(true);
         flutterView.setFocusableInTouchMode(true);
@@ -239,10 +239,18 @@ public class OverlayService extends Service implements View.OnTouchListener {
     private void resizeOverlay(int width, int height, boolean enableDrag, MethodChannel.Result result) {
         if (windowManager != null) {
             WindowManager.LayoutParams params = (WindowManager.LayoutParams) flutterView.getLayoutParams();
+            final boolean shouldHideDuringResize =
+                    params.width != resolveOverlayWidth(width) || params.height != resolveOverlayHeight(height);
+            if (shouldHideDuringResize) {
+                flutterView.setVisibility(View.INVISIBLE);
+            }
             params.width = resolveOverlayWidth(width);
             params.height = resolveOverlayHeight(height);
             WindowSetup.enableDrag = enableDrag;
             windowManager.updateViewLayout(flutterView, params);
+            if (shouldHideDuringResize) {
+                flutterView.postDelayed(() -> flutterView.setVisibility(View.VISIBLE), 32);
+            }
             result.success(true);
         } else {
             result.success(false);
