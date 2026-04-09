@@ -403,12 +403,12 @@ public class OverlayService extends Service implements View.OnTouchListener {
                     dragging = false;
                     lastX = event.getRawX();
                     lastY = event.getRawY();
-                    break;
+                    return true;
                 case MotionEvent.ACTION_MOVE:
                     float dx = event.getRawX() - lastX;
                     float dy = event.getRawY() - lastY;
                     if (!dragging && dx * dx + dy * dy < 25) {
-                        return false;
+                        return true;
                     }
                     lastX = event.getRawX();
                     lastY = event.getRawY();
@@ -426,24 +426,51 @@ public class OverlayService extends Service implements View.OnTouchListener {
                         windowManager.updateViewLayout(flutterView, params);
                     }
                     dragging = true;
-                    break;
+                    return true;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL:
                     lastYPosition = params.y;
+                    if (!dragging) {
+                        emitOverlayEvent(OverlayConstants.EVENT_BUBBLE_TAP, null);
+                        return true;
+                    }
                     if (!WindowSetup.positionGravity.equals("none")) {
-                        if (windowManager == null) return false;
+                        if (windowManager == null) return true;
                         windowManager.updateViewLayout(flutterView, params);
                         mTrayTimerTask = new TrayAnimationTimerTask();
                         mTrayAnimationTimer = new Timer();
                         mTrayAnimationTimer.schedule(mTrayTimerTask, 0, 25);
+                        return true;
                     }
-                    return false;
+                    emitOverlayEvent(
+                            OverlayConstants.EVENT_BUBBLE_DRAG_END,
+                            buildCurrentPositionPayload(params)
+                    );
+                    return true;
                 default:
-                    return false;
+                    return true;
             }
-            return false;
         }
         return false;
+    }
+
+    private Map<String, Double> buildCurrentPositionPayload(WindowManager.LayoutParams params) {
+        Map<String, Double> payload = new HashMap<>();
+        payload.put("x", pxToDp(params.x));
+        payload.put("y", pxToDp(params.y));
+        return payload;
+    }
+
+    private void emitOverlayEvent(String eventType, @Nullable Map<String, Double> positionPayload) {
+        if (overlayMessageChannel == null) {
+            return;
+        }
+        Map<String, Object> payload = new HashMap<>();
+        payload.put(OverlayConstants.EVENT, eventType);
+        if (positionPayload != null) {
+            payload.putAll(positionPayload);
+        }
+        overlayMessageChannel.send(payload);
     }
 
     private class TrayAnimationTimerTask extends TimerTask {

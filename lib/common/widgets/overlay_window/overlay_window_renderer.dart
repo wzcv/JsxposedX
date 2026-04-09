@@ -27,9 +27,6 @@ class _OverlayWindowRendererState extends State<OverlayWindowRenderer> {
   );
   _OverlayViewport? _fullViewport;
   Offset? _bubbleVisualOffset;
-  Offset? _dragStartGlobal;
-  Offset? _dragOrigin;
-  bool _dragging = false;
   bool _needsBubbleHostSync = true;
 
   @override
@@ -63,15 +60,9 @@ class _OverlayWindowRendererState extends State<OverlayWindowRenderer> {
             hostSize: hostSize,
             safePadding: safePadding,
           );
-          final resolvedBubbleVisualOffset = _resolvedBubbleVisualOffset(
-            viewport: viewport,
-            bubbleSize: bubbleSize,
-          );
-
           if (_payload.isBubble &&
               _needsBubbleHostSync &&
-              _fullViewport != null &&
-              !_dragging) {
+              _fullViewport != null) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted || !_payload.isBubble || !_needsBubbleHostSync) {
                 return;
@@ -100,22 +91,7 @@ class _OverlayWindowRendererState extends State<OverlayWindowRenderer> {
           return SizedBox.expand(
             child: Padding(
               padding: const EdgeInsets.all(_bubbleHostPadding),
-              child: _OverlayBubble(
-                size: bubbleSize,
-                dragging: _dragging,
-                onTap: () => _setDisplayMode(OverlayWindowDisplayMode.panel),
-                onPanStart: (details) =>
-                    _handlePanStart(details, resolvedBubbleVisualOffset),
-                onPanUpdate: (details) => _handlePanUpdate(
-                  details,
-                  viewport: viewport,
-                  bubbleSize: bubbleSize,
-                ),
-                onPanEnd: (_) =>
-                    _handlePanEnd(viewport: viewport, bubbleSize: bubbleSize),
-                onPanCancel: () =>
-                    _handlePanEnd(viewport: viewport, bubbleSize: bubbleSize),
-              ),
+              child: _OverlayBubble(size: bubbleSize),
             ),
           );
         },
@@ -124,6 +100,12 @@ class _OverlayWindowRendererState extends State<OverlayWindowRenderer> {
   }
 
   void _handlePayload(dynamic rawPayload) {
+    final overlayEvent = OverlayWindowEvent.maybeFromRaw(rawPayload);
+    if (overlayEvent != null) {
+      _handleOverlayEvent(overlayEvent);
+      return;
+    }
+
     final nextPayload = OverlayWindowPayload.fromRaw(rawPayload);
     if (!mounted) {
       return;
@@ -132,15 +114,50 @@ class _OverlayWindowRendererState extends State<OverlayWindowRenderer> {
     setState(() {
       _payload = nextPayload;
       if (nextPayload.isPanel) {
-        _dragging = false;
-        _dragStartGlobal = null;
-        _dragOrigin = null;
+        _needsBubbleHostSync = false;
       } else {
         _needsBubbleHostSync = true;
       }
     });
 
     unawaited(_syncOverlayHost());
+  }
+
+  void _handleOverlayEvent(OverlayWindowEvent event) {
+    if (!mounted || !_payload.isBubble) {
+      return;
+    }
+
+    if (event.isBubbleTap) {
+      unawaited(_setDisplayMode(OverlayWindowDisplayMode.panel));
+      return;
+    }
+
+    if (!event.isBubbleDragEnd) {
+      return;
+    }
+
+    final hostPosition = event.hostPosition;
+    final viewport = _fullViewport;
+    if (hostPosition == null || viewport == null) {
+      return;
+    }
+
+    final bubbleSize = _bubbleSizeForScene(_payload.scene);
+    final visualOffset = Offset(
+      hostPosition.x + _bubbleHostPadding,
+      hostPosition.y + _bubbleHostPadding,
+    );
+    final snappedVisualOffset = _snapBubbleVisualOffset(
+      visualOffset,
+      viewport: viewport,
+      bubbleSize: bubbleSize,
+    );
+
+    setState(() {
+      _bubbleVisualOffset = snappedVisualOffset;
+    });
+    unawaited(_moveBubbleHostToVisualOffset(snappedVisualOffset));
   }
 
   Future<void> _setDisplayMode(String displayMode) async {
@@ -152,9 +169,7 @@ class _OverlayWindowRendererState extends State<OverlayWindowRenderer> {
     setState(() {
       _payload = nextPayload;
       if (nextPayload.isPanel) {
-        _dragging = false;
-        _dragStartGlobal = null;
-        _dragOrigin = null;
+        _needsBubbleHostSync = false;
       } else {
         _needsBubbleHostSync = true;
       }
@@ -198,67 +213,10 @@ class _OverlayWindowRendererState extends State<OverlayWindowRenderer> {
     await FlutterOverlayWindow.resizeOverlay(
       hostExtent.round(),
       hostExtent.round(),
-      false,
+      true,
     );
     await _moveBubbleHostToVisualOffset(bubbleVisualOffset);
     await FlutterOverlayWindow.updateFlag(overlayFlag);
-  }
-
-  void _handlePanStart(
-    DragStartDetails details,
-    Offset resolvedBubbleVisualOffset,
-  ) {
-    setState(() {
-      _dragging = true;
-      _dragStartGlobal = details.globalPosition;
-      _dragOrigin = resolvedBubbleVisualOffset;
-    });
-  }
-
-  void _handlePanUpdate(
-    DragUpdateDetails details, {
-    required _OverlayViewport viewport,
-    required double bubbleSize,
-  }) {
-    final dragStartGlobal = _dragStartGlobal;
-    final dragOrigin = _dragOrigin;
-    if (dragStartGlobal == null || dragOrigin == null) {
-      return;
-    }
-
-    final delta = details.globalPosition - dragStartGlobal;
-    final nextVisualOffset = _clampBubbleVisualOffset(
-      dragOrigin + delta,
-      viewport: viewport,
-      bubbleSize: bubbleSize,
-    );
-    setState(() {
-      _bubbleVisualOffset = nextVisualOffset;
-    });
-    unawaited(_moveBubbleHostToVisualOffset(nextVisualOffset));
-  }
-
-  void _handlePanEnd({
-    required _OverlayViewport viewport,
-    required double bubbleSize,
-  }) {
-    final currentVisualOffset = _resolvedBubbleVisualOffset(
-      viewport: viewport,
-      bubbleSize: bubbleSize,
-    );
-    final snappedVisualOffset = _snapBubbleVisualOffset(
-      currentVisualOffset,
-      viewport: viewport,
-      bubbleSize: bubbleSize,
-    );
-
-    setState(() {
-      _bubbleVisualOffset = snappedVisualOffset;
-      _dragging = false;
-      _dragStartGlobal = null;
-      _dragOrigin = null;
-    });
-    unawaited(_moveBubbleHostToVisualOffset(snappedVisualOffset));
   }
 
   _OverlayViewport _resolvedViewport({
@@ -411,69 +369,43 @@ class _OverlayWindowRendererState extends State<OverlayWindowRenderer> {
 }
 
 class _OverlayBubble extends StatelessWidget {
-  const _OverlayBubble({
-    required this.size,
-    required this.dragging,
-    required this.onTap,
-    required this.onPanStart,
-    required this.onPanUpdate,
-    required this.onPanEnd,
-    required this.onPanCancel,
-  });
+  const _OverlayBubble({required this.size});
 
   final double size;
-  final bool dragging;
-  final VoidCallback onTap;
-  final GestureDragStartCallback onPanStart;
-  final GestureDragUpdateCallback onPanUpdate;
-  final GestureDragEndCallback onPanEnd;
-  final VoidCallback onPanCancel;
 
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: dragging ? null : onTap,
-        onPanStart: onPanStart,
-        onPanUpdate: onPanUpdate,
-        onPanEnd: onPanEnd,
-        onPanCancel: onPanCancel,
-        child: AnimatedScale(
-          scale: dragging ? 1.04 : 1,
-          duration: const Duration(milliseconds: 160),
-          child: Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: <Color>[
-                  Color(0xFF6AA9FF),
-                  Color(0xFF8B7BFF),
-                  Color(0xFFFFA87A),
-                ],
-              ),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.72),
-                width: 2.2,
-              ),
-              boxShadow: <BoxShadow>[
-                BoxShadow(
-                  color: const Color(0xFF111A2E).withValues(alpha: 0.28),
-                  blurRadius: 28,
-                  offset: const Offset(0, 14),
-                ),
-              ],
-            ),
-            child: Icon(
-              Icons.memory_rounded,
-              color: Colors.white.withValues(alpha: 0.96),
-              size: 58,
-            ),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: <Color>[
+              Color(0xFF6AA9FF),
+              Color(0xFF8B7BFF),
+              Color(0xFFFFA87A),
+            ],
           ),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.72),
+            width: 2.2,
+          ),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: const Color(0xFF111A2E).withValues(alpha: 0.28),
+              blurRadius: 28,
+              offset: const Offset(0, 14),
+            ),
+          ],
+        ),
+        child: Icon(
+          Icons.memory_rounded,
+          color: Colors.white.withValues(alpha: 0.96),
+          size: 58,
         ),
       ),
     );

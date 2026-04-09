@@ -79,3 +79,65 @@ class OverlayWindowPayload {
     );
   }
 }
+
+class OverlayWindowEventType {
+  static const String bubbleTap = 'bubbleTap';
+  static const String bubbleDragEnd = 'bubbleDragEnd';
+}
+
+class OverlayWindowEvent {
+  const OverlayWindowEvent._({required this.type, this.hostPosition});
+
+  final String type;
+  final OverlayHostPosition? hostPosition;
+
+  bool get isBubbleTap => type == OverlayWindowEventType.bubbleTap;
+  bool get isBubbleDragEnd => type == OverlayWindowEventType.bubbleDragEnd;
+
+  static OverlayWindowEvent? maybeFromRaw(dynamic raw) {
+    if (raw is! Map) {
+      return null;
+    }
+
+    final normalized = raw.map((key, value) => MapEntry(key.toString(), value));
+    final eventType = normalized['event']?.toString();
+    if (eventType == null) {
+      return null;
+    }
+
+    switch (eventType) {
+      case OverlayWindowEventType.bubbleTap:
+        return const OverlayWindowEvent._(
+          type: OverlayWindowEventType.bubbleTap,
+        );
+      case OverlayWindowEventType.bubbleDragEnd:
+        final x = _parseDouble(normalized['x']);
+        final y = _parseDouble(normalized['y']);
+        if (x == null || y == null) {
+          return null;
+        }
+        return OverlayWindowEvent._(
+          type: OverlayWindowEventType.bubbleDragEnd,
+          hostPosition: OverlayHostPosition(x: x, y: y),
+        );
+      default:
+        return null;
+    }
+  }
+
+  static double? _parseDouble(Object? value) {
+    return switch (value) {
+      int number => number.toDouble(),
+      double number => number,
+      String text => double.tryParse(text),
+      _ => null,
+    };
+  }
+}
+
+class OverlayHostPosition {
+  const OverlayHostPosition({required this.x, required this.y});
+
+  final double x;
+  final double y;
+}

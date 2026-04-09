@@ -11,4 +11,7 @@ final public class OverlayConstants {
     static final int DEFAULT_XY = -6;
     static final int MATCH_PARENT = -1;
     static final int FULL_COVER = -1999;
+    static final String EVENT = "event";
+    static final String EVENT_BUBBLE_TAP = "bubbleTap";
+    static final String EVENT_BUBBLE_DRAG_END = "bubbleDragEnd";
 }
