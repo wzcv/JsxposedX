@@ -2,9 +2,14 @@ package com.jsxposed.x.core.bridge.memory_tool_native
 
 import android.app.ActivityManager
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.os.Build
+import androidx.annotation.RequiresApi
+import com.jsxposed.x.core.utils.log.LogX
 import com.jsxposed.x.core.utils.shell.Shell
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 object MemoryToolJni {
     init {
@@ -15,6 +20,12 @@ object MemoryToolJni {
 }
 
 class MemoryTool(private val context: Context) {
+    companion object {
+        private const val TAG = "MemoryTool"
+        private val foregroundPackageRegex =
+            Regex("""([A-Za-z0-9._]+)/(?:[A-Za-z0-9._$]+|\.[A-Za-z0-9._$]+)""")
+    }
+
     private val packageManager = context.packageManager
     private val activityManager =
         context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
@@ -24,6 +35,7 @@ class MemoryTool(private val context: Context) {
         return MemoryToolJni.getPid(packageName)
     }
 
+    @RequiresApi(Build.VERSION_CODES.P)
     fun getProcessInfo(offset: Int, limit: Int): List<ProcessInfo> {
         if (limit <= 0) {
             return emptyList()
@@ -32,6 +44,7 @@ class MemoryTool(private val context: Context) {
         val runningProcessMap = activityManager.runningAppProcesses
             ?.associateBy { it.pid }
             .orEmpty()
+        val foregroundPackageName = resolveForegroundPackageName()
 
         val sortedProcesses = readProcessEntries()
             .mapNotNull { rawProcess ->
@@ -40,6 +53,8 @@ class MemoryTool(private val context: Context) {
             .distinctBy { it.pid }
             .sortedWith(
                 compareBy<ResolvedProcess>(
+                    { if (it.packageName == foregroundPackageName) 0 else 1 },
+                    { if (it.isThirdPartyApp) 0 else 1 },
                     { importanceRank(it.importance) },
                     { it.name.lowercase(Locale.ROOT) },
                     { it.pid }
@@ -66,11 +81,14 @@ class MemoryTool(private val context: Context) {
     }
 
     private fun readProcessEntries(): List<RawProcessEntry> {
+        if (!hasRootAccess()) {
+            LogX.w(TAG, "getProcessInfo requires root access")
+            return emptyList()
+        }
+
         val commands = listOf(
             Shell(su = true).execute("ps -A"),
-            Shell().execute("ps -A"),
-            Shell(su = true).execute("ps"),
-            Shell().execute("ps")
+            Shell(su = true).execute("ps")
         )
 
         for (output in commands) {
@@ -80,6 +98,7 @@ class MemoryTool(private val context: Context) {
             }
         }
 
+        LogX.w(TAG, "getProcessInfo root ps returned empty result")
         return emptyList()
     }
 
@@ -142,7 +161,8 @@ class MemoryTool(private val context: Context) {
             pid = rawProcess.pid,
             name = rawProcess.processName,
             packageName = packageName,
-            importance = runningProcessInfo?.importance ?: Int.MAX_VALUE
+            importance = runningProcessInfo?.importance ?: Int.MAX_VALUE,
+            isThirdPartyApp = isThirdPartyApp(packageName)
         )
     }
 
@@ -169,6 +189,73 @@ class MemoryTool(private val context: Context) {
         } catch (_: PackageManager.NameNotFoundException) {
             false
         }
+    }
+
+    private fun isThirdPartyApp(packageName: String): Boolean {
+        return try {
+            val appInfo = packageManager.getApplicationInfo(packageName, 0)
+            (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) == 0 &&
+                (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 0
+        } catch (_: PackageManager.NameNotFoundException) {
+            false
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun hasRootAccess(): Boolean {
+        return try {
+            val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "id")).apply {
+                waitFor(1200, TimeUnit.MILLISECONDS)
+            }
+            process.exitValue() == 0
+        } catch (e: Exception) {
+            LogX.w(TAG, "root check failed: ${e.message}")
+            false
+        }
+    }
+
+    private fun resolveForegroundPackageName(): String? {
+        val outputs = listOf(
+            Shell(su = true).execute("dumpsys window windows"),
+            Shell(su = true).execute("dumpsys activity top")
+        )
+
+        for (output in outputs) {
+            val packageName = parseForegroundPackageName(output)
+            if (packageName != null) {
+                return packageName
+            }
+        }
+
+        LogX.w(TAG, "failed to resolve foreground package name")
+        return null
+    }
+
+    private fun parseForegroundPackageName(output: String): String? {
+        if (output.isBlank() || output.startsWith("ERROR") || output.startsWith("EXCEPTION")) {
+            return null
+        }
+
+        val prioritizedLines = output.lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .sortedBy { line ->
+                when {
+                    "mCurrentFocus" in line -> 0
+                    "mFocusedApp" in line -> 1
+                    line.startsWith("ACTIVITY ") -> 2
+                    else -> 3
+                }
+            }
+
+        for (line in prioritizedLines) {
+            val packageName = foregroundPackageRegex.find(line)?.groupValues?.getOrNull(1)
+            if (packageName != null && isInstalledPackage(packageName)) {
+                return packageName
+            }
+        }
+
+        return null
     }
 
     private fun importanceRank(importance: Int): Int {
@@ -199,6 +286,7 @@ class MemoryTool(private val context: Context) {
         val pid: Int,
         val name: String,
         val packageName: String,
-        val importance: Int
+        val importance: Int,
+        val isThirdPartyApp: Boolean
     )
 }
