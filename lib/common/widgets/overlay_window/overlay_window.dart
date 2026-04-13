@@ -81,8 +81,6 @@ class OverlayWindow extends StatelessWidget {
       color: Colors.transparent,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final shouldFillWidth = maxWidth == null;
-          final shouldFillHeight = maxHeight == null;
           final resolvedMaxWidth = maxWidth == null
               ? constraints.maxWidth
               : math.min(maxWidth!, constraints.maxWidth);
@@ -137,9 +135,9 @@ class OverlayWindow extends StatelessWidget {
                     alignment: Alignment.center,
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
-                        minWidth: shouldFillWidth ? resolvedMaxWidth : 0,
+                        minWidth: maxWidth == null ? resolvedMaxWidth : 0,
                         maxWidth: resolvedMaxWidth,
-                        minHeight: shouldFillHeight ? resolvedMaxHeight : 0,
+                        minHeight: maxHeight == null ? resolvedMaxHeight : 0,
                         maxHeight: resolvedMaxHeight,
                       ),
                       child: panel,
@@ -345,7 +343,7 @@ class OverlayWindowBar extends StatelessWidget implements PreferredSizeWidget {
         titleSpacing ??
         appBarTheme.titleSpacing ??
         NavigationToolbar.kMiddleSpacing;
-    final resolvedActionSpacing = actionSpacing ?? 8.w;
+    final resolvedActionSpacing = actionSpacing ?? 8.r;
     final resolvedToolbarHeight = toolbarHeight ?? kToolbarHeight;
     final resolvedForegroundColor =
         foregroundColor ?? appBarTheme.foregroundColor ?? colorScheme.onSurface;
@@ -381,7 +379,7 @@ class OverlayWindowBar extends StatelessWidget implements PreferredSizeWidget {
                   child: title!,
                 ),
               if (subtitle != null) ...<Widget>[
-                if (title != null) SizedBox(height: 4.h),
+                if (title != null) SizedBox(height: 4.r),
                 DefaultTextStyle(
                   style:
                       appBarTheme.toolbarTextStyle ??
@@ -508,8 +506,8 @@ class OverlayWindowHeaderButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(12.r),
         onTap: onPressed,
         child: SizedBox(
-          width: 40.w,
-          height: 40.w,
+          width: 40.r,
+          height: 40.r,
           child: Icon(icon, size: 20.sp, color: colorScheme.onSurface),
         ),
       ),

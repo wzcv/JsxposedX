@@ -27,57 +27,50 @@ class MemoryToolOverlay extends HookConsumerWidget {
     final isPickerVisible = useState(false);
     final selectedProcess = ref.watch(memoryToolSelectedProcessProvider);
 
-    return OverlayWindowScaffold(
-      overlayConfig: overlayConfig,
-      borderRadius: BorderRadius.circular(8.r),
-      overlayBar: OverlayWindowBar(
-        backgroundColor: context.colorScheme.surface.withValues(alpha: 0.3),
-        title: Text(
-          context.l10n.overlayMemoryToolTitle,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        leadingWidth: 48.w,
-        leading: IconButton(
-          padding: EdgeInsets.zero,
-          onPressed: () {
-            isPickerVisible.value = true;
-          },
-          icon: ProcessAvatar(process: selectedProcess),
-        ),
-        showMinimizeAction: true,
-        showCloseAction: false,
-      ),
-      backgroundColor: context.colorScheme.surface.withValues(alpha: 0.6),
-      margin: EdgeInsets.all(8.r),
-      body: Stack(
-        children: [
-          SelectedProcessPanel(selectedProcess: selectedProcess),
-          if (isPickerVisible.value)
-            Positioned.fill(
-              child: MemoryToolProcessPickerDialog(
-                onClose: () {
-                  isPickerVisible.value = false;
-                },
-                onSelected: (process) {
-                  ref
-                      .read(memoryToolSelectedProcessProvider.notifier)
-                      .select(process);
-                  isPickerVisible.value = false;
-                },
-                onRetry: () {
-                  ref.invalidate(getProcessInfoProvider(offset: 0, limit: 20));
-                },
-              ),
+    return Stack(
+      children: [
+        OverlayWindowScaffold(
+          overlayConfig: overlayConfig,
+          borderRadius: BorderRadius.circular(8.r),
+          overlayBar: OverlayWindowBar(
+            backgroundColor: context.colorScheme.surface.withValues(alpha: 0.3),
+            title: Text(
+              context.l10n.overlayMemoryToolTitle,
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-        ],
-      ),
-      bottomBar: NavigationBar(
-        selectedIndex: 0,
-        destinations: [
-          NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.settings), label: 'Settings'),
-        ],
-      ),
+            leadingWidth: 48.r,
+            leading: IconButton(
+              padding: EdgeInsets.zero,
+              onPressed: () {
+                isPickerVisible.value = true;
+              },
+              icon: ProcessAvatar(process: selectedProcess),
+            ),
+            showMinimizeAction: true,
+            showCloseAction: false,
+          ),
+          backgroundColor: context.colorScheme.surface.withValues(alpha: 0.6),
+          margin: EdgeInsets.all(8.r),
+          body: SelectedProcessPanel(selectedProcess: selectedProcess),
+        ),
+        if (isPickerVisible.value)
+          Positioned.fill(
+            child: MemoryToolProcessPickerDialog(
+              onClose: () {
+                isPickerVisible.value = false;
+              },
+              onSelected: (process) {
+                ref
+                    .read(memoryToolSelectedProcessProvider.notifier)
+                    .select(process);
+                isPickerVisible.value = false;
+              },
+              onRetry: () {
+                ref.invalidate(getProcessInfoProvider(offset: 0, limit: 20));
+              },
+            ),
+          ),
+      ],
     );
   }
 }

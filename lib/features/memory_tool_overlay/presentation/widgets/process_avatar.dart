@@ -15,15 +15,15 @@ class ProcessAvatar extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(8.r),
       child: SizedBox(
-        width: 40.sp,
-        height: 40.sp,
+        width: 40.r,
+        height: 40.r,
         child: icon != null && icon.isNotEmpty
             ? Image.memory(icon, fit: BoxFit.cover)
             : ColoredBox(
                 color: context.colorScheme.surfaceContainerHighest,
                 child: Icon(
                   Icons.apps_rounded,
-                  size: 20.sp,
+                  size: 20.r,
                   color: context.colorScheme.primary,
                 ),
               ),
