@@ -9,6 +9,8 @@ void SearchSession::Clear() {
     exact_mode = true;
     little_endian = true;
     value_size = 0;
+    current_value_bytes.clear();
+    current_display_value.clear();
     regions.clear();
     results.clear();
 }

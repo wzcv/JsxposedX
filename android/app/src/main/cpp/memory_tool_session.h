@@ -49,7 +49,6 @@ struct MemoryRegion {
 struct SearchResultEntry {
     uint64_t address = 0;
     uint64_t region_start = 0;
-    std::vector<uint8_t> raw_bytes;
 };
 
 struct SearchResultView {
@@ -106,6 +105,8 @@ struct SearchSession {
     bool exact_mode = true;
     bool little_endian = true;
     size_t value_size = 0;
+    std::vector<uint8_t> current_value_bytes;
+    std::string current_display_value;
     std::vector<MemoryRegion> regions;
     std::vector<SearchResultEntry> results;
 

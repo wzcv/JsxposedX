@@ -6,7 +6,10 @@ namespace memory_tool {
 
 namespace {
 
-constexpr size_t kChunkSize = 256 * 1024;
+constexpr size_t kChunkSize = 1024 * 1024;
+constexpr size_t kNextScanBatchSize = 256;
+constexpr size_t kProgressEntryInterval = 2048;
+constexpr uint64_t kProgressByteInterval = 4ULL * 1024ULL * 1024ULL;
 
 size_t ResolveStep(SearchValueType type) {
     switch (type) {
@@ -40,6 +43,7 @@ std::vector<SearchResultEntry> FirstScan(ProcessMemoryReader* reader,
     const size_t step = ResolveStep(type);
     const size_t overlap = pattern.size() > 1 ? pattern.size() - 1 : 0;
     SearchScanProgress progress;
+    uint64_t last_reported_byte_count = 0;
     progress.total_region_count = regions.size();
     for (const MemoryRegion& region : regions) {
         progress.total_byte_count += region.size;
@@ -71,16 +75,18 @@ std::vector<SearchResultEntry> FirstScan(ProcessMemoryReader* reader,
                 SearchResultEntry entry;
                 entry.address = cursor + index;
                 entry.region_start = region.start_address;
-                entry.raw_bytes.assign(buffer.begin() + static_cast<std::ptrdiff_t>(index),
-                                       buffer.begin() +
-                                           static_cast<std::ptrdiff_t>(index + pattern.size()));
                 results.push_back(std::move(entry));
             }
 
             progress.processed_byte_count += base_read_size;
             progress.result_count = results.size();
-            if (progress_callback && !progress_callback(progress)) {
+            const bool should_report =
+                (progress.processed_byte_count - last_reported_byte_count) >= kProgressByteInterval;
+            if (should_report && progress_callback && !progress_callback(progress)) {
                 return results;
+            }
+            if (should_report) {
+                last_reported_byte_count = progress.processed_byte_count;
             }
             cursor += base_read_size;
         }
@@ -105,6 +111,7 @@ std::vector<SearchResultEntry> NextScan(ProcessMemoryReader* reader,
     }
 
     SearchScanProgress progress;
+    size_t last_reported_entry_count = 0;
     progress.total_entry_count = previous_results.size();
     progress.total_byte_count =
         static_cast<uint64_t>(previous_results.size()) * static_cast<uint64_t>(pattern.size());
@@ -112,39 +119,43 @@ std::vector<SearchResultEntry> NextScan(ProcessMemoryReader* reader,
         return results;
     }
 
-    for (const SearchResultEntry& candidate : previous_results) {
-        std::vector<uint8_t> current;
-        if (!reader->Read(candidate.address, pattern.size(), &current)) {
-            ++progress.processed_entry_count;
-            progress.processed_byte_count += pattern.size();
-            progress.result_count = results.size();
-            if (progress_callback && !progress_callback(progress)) {
-                return results;
-            }
-            continue;
-        }
-        if (!std::equal(pattern.begin(), pattern.end(), current.begin())) {
-            ++progress.processed_entry_count;
-            progress.processed_byte_count += pattern.size();
-            progress.result_count = results.size();
-            if (progress_callback && !progress_callback(progress)) {
-                return results;
-            }
-            continue;
+    for (size_t start = 0; start < previous_results.size(); start += kNextScanBatchSize) {
+        const size_t count = std::min(kNextScanBatchSize, previous_results.size() - start);
+        std::vector<uint64_t> addresses;
+        addresses.reserve(count);
+        for (size_t index = 0; index < count; ++index) {
+            addresses.push_back(previous_results[start + index].address);
         }
 
-        SearchResultEntry entry = candidate;
-        entry.raw_bytes = std::move(current);
-        results.push_back(std::move(entry));
+        std::vector<std::vector<uint8_t>> buffers;
+        reader->ReadMany(addresses, pattern.size(), &buffers);
+        for (size_t index = 0; index < count; ++index) {
+            const SearchResultEntry& candidate = previous_results[start + index];
+            const std::vector<uint8_t>& current = buffers[index];
+            if (current.size() == pattern.size() &&
+                std::equal(pattern.begin(), pattern.end(), current.begin())) {
+                SearchResultEntry entry = candidate;
+                results.push_back(std::move(entry));
+            }
+        }
 
-        ++progress.processed_entry_count;
-        progress.processed_byte_count += pattern.size();
+        progress.processed_entry_count += count;
+        progress.processed_byte_count += static_cast<uint64_t>(count) *
+                                         static_cast<uint64_t>(pattern.size());
         progress.result_count = results.size();
-        if (progress_callback && !progress_callback(progress)) {
+        const bool should_report =
+            (progress.processed_entry_count - last_reported_entry_count) >= kProgressEntryInterval;
+        if (should_report && progress_callback && !progress_callback(progress)) {
             return results;
+        }
+        if (should_report) {
+            last_reported_entry_count = progress.processed_entry_count;
         }
     }
 
+    if (progress_callback) {
+        progress_callback(progress);
+    }
     return results;
 }
 

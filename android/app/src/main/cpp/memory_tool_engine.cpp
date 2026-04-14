@@ -1,6 +1,7 @@
 #include "memory_tool_engine.h"
 
 #include <algorithm>
+#include <iterator>
 #include <stdexcept>
 #include <thread>
 #include <utility>
@@ -12,6 +13,8 @@
 namespace memory_tool {
 
 namespace {
+
+constexpr size_t kMaxParallelFirstScanWorkers = 6;
 
 uint64_t ElapsedMilliseconds(const std::chrono::steady_clock::time_point& started_at) {
     if (started_at == std::chrono::steady_clock::time_point{}) {
@@ -48,6 +51,38 @@ std::vector<MemoryRegion> FilterRegionsByTypeKeys(const std::vector<MemoryRegion
         }
     }
     return filtered;
+}
+
+size_t ResolveFirstScanWorkerCount(size_t region_count) {
+    if (region_count <= 1) {
+        return region_count;
+    }
+
+    const unsigned int hardware_workers = std::thread::hardware_concurrency();
+    const size_t preferred_workers = hardware_workers == 0 ? 4U : hardware_workers;
+    return std::max<size_t>(
+        1,
+        std::min(region_count, std::min(preferred_workers, kMaxParallelFirstScanWorkers)));
+}
+
+std::vector<std::vector<MemoryRegion>> PartitionRegionsForWorkers(
+    const std::vector<MemoryRegion>& regions,
+    size_t worker_count) {
+    if (worker_count <= 1) {
+        return {regions};
+    }
+
+    std::vector<std::vector<MemoryRegion>> buckets(worker_count);
+    std::vector<uint64_t> bucket_sizes(worker_count, 0);
+    for (const MemoryRegion& region : regions) {
+        const auto iterator =
+            std::min_element(bucket_sizes.begin(), bucket_sizes.end());
+        const size_t bucket_index =
+            static_cast<size_t>(std::distance(bucket_sizes.begin(), iterator));
+        buckets[bucket_index].push_back(region);
+        bucket_sizes[bucket_index] += region.size;
+    }
+    return buckets;
 }
 
 }  // namespace
@@ -176,17 +211,121 @@ void MemoryToolEngine::FirstScan(int pid,
             if (!scan_all_readable_regions) {
                 regions = FilterRegionsByTypeKeys(regions, range_section_keys);
             }
-            ProcessMemoryReader reader(pid);
-            std::vector<SearchResultEntry> results = ::memory_tool::FirstScan(
-                &reader,
-                regions,
-                pattern,
-                value_type,
-                [this, generation](const SearchScanProgress& progress) {
-                    return UpdateTaskProgress(generation, progress);
-                });
+            uint64_t total_byte_count = 0;
+            for (const MemoryRegion& region : regions) {
+                total_byte_count += region.size;
+            }
+            const size_t worker_count = ResolveFirstScanWorkerCount(regions.size());
+            const std::vector<std::vector<MemoryRegion>> region_buckets =
+                PartitionRegionsForWorkers(regions, worker_count);
 
-            const size_t result_count = results.size();
+            std::atomic_size_t processed_region_count{0};
+            std::atomic_uint64_t processed_byte_count{0};
+            std::atomic_size_t aggregated_result_count{0};
+            std::atomic_bool should_stop{false};
+            std::mutex progress_mutex;
+            std::vector<std::vector<SearchResultEntry>> worker_results(region_buckets.size());
+            std::vector<std::thread> workers;
+            workers.reserve(region_buckets.size());
+
+            const auto report_progress = [this,
+                                          generation,
+                                          &regions,
+                                          &processed_region_count,
+                                          &processed_byte_count,
+                                          &aggregated_result_count,
+                                          &should_stop,
+                                          &progress_mutex,
+                                          total_byte_count]() {
+                std::lock_guard<std::mutex> lock(progress_mutex);
+                if (should_stop.load()) {
+                    return false;
+                }
+
+                SearchScanProgress progress;
+                progress.total_region_count = regions.size();
+                progress.total_byte_count = total_byte_count;
+                progress.processed_region_count = processed_region_count.load();
+                progress.processed_byte_count = processed_byte_count.load();
+                progress.result_count = aggregated_result_count.load();
+
+                if (!UpdateTaskProgress(generation, progress)) {
+                    should_stop.store(true);
+                    return false;
+                }
+                return true;
+            };
+
+            for (size_t index = 0; index < region_buckets.size(); ++index) {
+                if (region_buckets[index].empty()) {
+                    continue;
+                }
+
+                workers.emplace_back([&pattern,
+                                      &region_buckets,
+                                      &worker_results,
+                                      &processed_region_count,
+                                      &processed_byte_count,
+                                      &aggregated_result_count,
+                                      &report_progress,
+                                      &should_stop,
+                                      index,
+                                      pid,
+                                      value_type]() {
+                    ProcessMemoryReader reader(pid);
+                    SearchScanProgress local_progress;
+                    worker_results[index] = ::memory_tool::FirstScan(
+                        &reader,
+                        region_buckets[index],
+                        pattern,
+                        value_type,
+                        [&](const SearchScanProgress& progress) {
+                            if (should_stop.load()) {
+                                return false;
+                            }
+
+                            processed_region_count.fetch_add(progress.processed_region_count -
+                                                             local_progress.processed_region_count);
+                            processed_byte_count.fetch_add(progress.processed_byte_count -
+                                                           local_progress.processed_byte_count);
+                            aggregated_result_count.fetch_add(progress.result_count -
+                                                              local_progress.result_count);
+                            local_progress = progress;
+                            return report_progress();
+                        });
+                });
+            }
+
+            for (std::thread& worker : workers) {
+                if (worker.joinable()) {
+                    worker.join();
+                }
+            }
+
+            if (should_stop.load()) {
+                return;
+            }
+
+            std::vector<SearchResultEntry> results;
+            size_t result_count = 0;
+            for (const auto& entries : worker_results) {
+                result_count += entries.size();
+            }
+            results.reserve(result_count);
+            for (auto& entries : worker_results) {
+                results.insert(results.end(),
+                               std::make_move_iterator(entries.begin()),
+                               std::make_move_iterator(entries.end()));
+            }
+            std::sort(results.begin(),
+                      results.end(),
+                      [](const SearchResultEntry& left, const SearchResultEntry& right) {
+                          if (left.region_start != right.region_start) {
+                              return left.region_start < right.region_start;
+                          }
+                          return left.address < right.address;
+                      });
+
             SearchSession next_session;
             next_session.has_active_session = true;
             next_session.pid = pid;
@@ -194,6 +333,9 @@ void MemoryToolEngine::FirstScan(int pid,
             next_session.exact_mode = true;
             next_session.little_endian = little_endian;
             next_session.value_size = pattern.size();
+            next_session.current_value_bytes = pattern;
+            next_session.current_display_value =
+                FormatDisplayValue(value_type, pattern, little_endian);
             next_session.regions = std::move(regions);
             next_session.results = std::move(results);
             FinishTaskSuccess(generation, std::move(next_session), result_count);
@@ -253,6 +395,9 @@ void MemoryToolEngine::NextScan(const SearchValue& value, SearchMatchMode match_
             session_snapshot.results = std::move(results);
             session_snapshot.value_size = pattern.size();
             session_snapshot.little_endian = little_endian;
+            session_snapshot.current_value_bytes = pattern;
+            session_snapshot.current_display_value =
+                FormatDisplayValue(session_snapshot.type, pattern, little_endian);
             FinishTaskSuccess(generation, std::move(session_snapshot), result_count);
         } catch (const std::exception& exception) {
             FinishTaskFailure(generation, exception.what());
@@ -317,9 +462,8 @@ SearchResultView MemoryToolEngine::BuildSearchResultViewLocked(const SearchResul
         view.region_type_key = "other";
     }
     view.type = session_.type;
-    view.raw_bytes = entry.raw_bytes;
-    view.display_value =
-        FormatDisplayValue(session_.type, entry.raw_bytes, session_.little_endian);
+    view.raw_bytes = session_.current_value_bytes;
+    view.display_value = session_.current_display_value;
     return view;
 }
 
