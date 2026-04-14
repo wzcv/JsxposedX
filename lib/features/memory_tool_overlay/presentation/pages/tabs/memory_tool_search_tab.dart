@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:JsxposedX/features/memory_tool_overlay/presentation/pages/tabs/widgets/memory_tool_search_form_card.dart';
-import 'package:JsxposedX/features/memory_tool_overlay/presentation/pages/tabs/widgets/memory_tool_search_result_card.dart';
-import 'package:JsxposedX/features/memory_tool_overlay/presentation/pages/tabs/widgets/memory_tool_search_session_card.dart';
-import 'package:JsxposedX/features/memory_tool_overlay/presentation/pages/tabs/widgets/memory_tool_search_task_feedback.dart';
-import 'package:JsxposedX/features/memory_tool_overlay/presentation/pages/tabs/widgets/memory_tool_search_task_overlay.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_search_dialog.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_search_result_card.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_search_session_card.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_search_task_feedback.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_search_task_overlay.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_action_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_query_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_search_provider.dart';
@@ -20,32 +20,13 @@ class MemoryToolSearchTab extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     useAutomaticKeepAlive();
+    final isSearchDialogVisible = useState(false);
     final selectedProcess = ref.watch(memoryToolSelectedProcessProvider);
-    final searchFormState = ref.watch(memoryToolSearchFormProvider);
-    final searchActionState = ref.watch(memorySearchActionProvider);
     final sessionStateAsync = ref.watch(getSearchSessionStateProvider);
     final taskStateAsync = ref.watch(getSearchTaskStateProvider);
     final hasMatchingSession = ref.watch(hasMatchingSearchSessionProvider);
     final hasRunningTask = ref.watch(hasRunningSearchTaskProvider);
-    final valueController = useTextEditingController(
-      text: searchFormState.value,
-    );
     final previousTaskStatus = useRef<SearchTaskStatus?>(null);
-
-    useEffect(() {
-      if (valueController.text == searchFormState.value) {
-        return null;
-      }
-
-      valueController.value = valueController.value.copyWith(
-        text: searchFormState.value,
-        selection: TextSelection.collapsed(
-          offset: searchFormState.value.length,
-        ),
-        composing: TextRange.empty,
-      );
-      return null;
-    }, [searchFormState.value, valueController]);
 
     useEffect(() {
       if (!hasRunningTask) {
@@ -75,27 +56,6 @@ class MemoryToolSearchTab extends HookConsumerWidget {
       return null;
     }, [taskStateAsync]);
 
-    final formCard = MemoryToolSearchFormCard(
-      valueController: valueController,
-      state: searchFormState,
-      actionState: searchActionState,
-      hasRunningTask: hasRunningTask,
-      canRunNextScan: hasMatchingSession,
-      onValueChanged: ref
-          .read(memoryToolSearchFormProvider.notifier)
-          .updateValue,
-      onTypeChanged: ref.read(memoryToolSearchFormProvider.notifier).updateType,
-      onEndianChanged: ref
-          .read(memoryToolSearchFormProvider.notifier)
-          .updateEndian,
-      onFirstScan: ref.read(memoryToolSearchFormProvider.notifier).firstScan,
-      onNextScan: ref.read(memoryToolSearchFormProvider.notifier).nextScan,
-      onReset: ref
-          .read(memoryToolSearchFormProvider.notifier)
-          .resetSearchSession,
-      taskStatus: MemoryToolSearchTaskFeedback(taskStateAsync: taskStateAsync),
-    );
-
     final sessionCard = MemoryToolSearchSessionCard(
       sessionStateAsync: sessionStateAsync,
       selectedPid: selectedProcess?.pid,
@@ -118,62 +78,55 @@ class MemoryToolSearchTab extends HookConsumerWidget {
         final padding = EdgeInsets.all(
           constraints.maxHeight < 320 ? 8.r : 12.r,
         );
-        final isCompactLandscape =
-            constraints.maxHeight < 320 && constraints.maxWidth > 560;
-        final isCompactHeight = constraints.maxHeight < 420;
-
-        Widget content;
-        if (isCompactLandscape) {
-          content = Padding(
-            padding: padding,
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  flex: 11,
-                  child: ListView(
-                    children: <Widget>[
-                      formCard,
-                      SizedBox(height: spacing),
-                      sessionCard,
-                    ],
-                  ),
-                ),
-                SizedBox(width: spacing),
-                Expanded(flex: 9, child: resultCard),
-              ],
-            ),
-          );
-        } else if (isCompactHeight) {
-          final resultHeight =
-              (constraints.maxHeight.clamp(220.0, 320.0) as double) * 0.9;
-          content = ListView(
-            padding: padding,
+        final hasTaskFeedback = taskStateAsync.maybeWhen(
+          data: (state) =>
+              state.status == SearchTaskStatus.cancelled ||
+              state.status == SearchTaskStatus.failed,
+          orElse: () => false,
+        );
+        final content = Padding(
+          padding: padding,
+          child: Column(
             children: <Widget>[
-              formCard,
-              SizedBox(height: spacing),
               sessionCard,
-              SizedBox(height: spacing),
-              SizedBox(height: resultHeight, child: resultCard),
-            ],
-          );
-        } else {
-          content = Padding(
-            padding: padding,
-            child: Column(
-              children: <Widget>[
-                formCard,
+              if (hasMatchingSession) SizedBox(height: spacing),
+              if (hasTaskFeedback) ...<Widget>[
+                MemoryToolSearchTaskFeedback(taskStateAsync: taskStateAsync),
                 SizedBox(height: spacing),
-                sessionCard,
-                SizedBox(height: spacing),
-                Expanded(child: resultCard),
               ],
-            ),
-          );
-        }
+              Expanded(child: resultCard),
+            ],
+          ),
+        );
 
         return Stack(
           children: <Widget>[
             Positioned.fill(child: content),
+            Positioned(
+              right: 16.r,
+              bottom: 16.r,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  minimumSize: Size(52.r, 52.r),
+                  padding: EdgeInsets.symmetric(horizontal: 16.r),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18.r),
+                  ),
+                ),
+                onPressed: () {
+                  isSearchDialogVisible.value = true;
+                },
+                child: Icon(Icons.search_rounded, size: 22.r),
+              ),
+            ),
+            if (isSearchDialogVisible.value)
+              Positioned.fill(
+                child: MemoryToolSearchDialog(
+                  onClose: () {
+                    isSearchDialogVisible.value = false;
+                  },
+                ),
+              ),
             MemoryToolSearchTaskOverlay(
               taskStateAsync: taskStateAsync,
               onCancel: () {

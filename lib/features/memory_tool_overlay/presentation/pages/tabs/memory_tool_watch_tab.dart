@@ -1,5 +1,5 @@
 import 'package:JsxposedX/core/extensions/context_extensions.dart';
-import 'package:JsxposedX/features/memory_tool_overlay/presentation/pages/tabs/widgets/memory_tool_watch_preview_card.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_watch_preview_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 

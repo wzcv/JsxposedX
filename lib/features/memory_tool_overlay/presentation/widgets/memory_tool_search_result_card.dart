@@ -92,90 +92,75 @@ class MemoryToolSearchResultCard extends HookConsumerWidget {
       ),
       child: Padding(
         padding: EdgeInsets.all(14.r),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              context.l10n.memoryToolResultTitle,
-              style: context.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            SizedBox(height: 10.r),
-            Expanded(
-              child: !hasMatchingSession
-                  ? Center(
+        child: !hasMatchingSession
+            ? Center(
+                child: Text(
+                  context.l10n.noData,
+                  style: context.textTheme.bodyMedium?.copyWith(
+                    color: context.colorScheme.onSurface.withValues(
+                      alpha: 0.66,
+                    ),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              )
+            : resultsAsync.when(
+                data: (results) {
+                  if (results.isEmpty) {
+                    return Center(
                       child: Text(
-                        context.l10n.memoryToolResultInactiveHint,
+                        context.l10n.noData,
                         style: context.textTheme.bodyMedium?.copyWith(
                           color: context.colorScheme.onSurface.withValues(
                             alpha: 0.66,
                           ),
+                          fontWeight: FontWeight.w600,
                         ),
-                        textAlign: TextAlign.center,
                       ),
-                    )
-                  : resultsAsync.when(
-                      data: (results) {
-                        if (results.isEmpty) {
-                          return Center(
-                            child: Text(
-                              context.l10n.memoryToolResultEmpty,
-                              style: context.textTheme.bodyMedium?.copyWith(
-                                color: context.colorScheme.onSurface.withValues(
-                                  alpha: 0.66,
-                                ),
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          );
-                        }
+                    );
+                  }
 
-                        final totalCount = sessionStateAsync.maybeWhen(
-                          data: (state) => state.resultCount,
-                          orElse: () => results.length,
-                        );
-                        final hasMore = results.length < totalCount;
+                  final totalCount = sessionStateAsync.maybeWhen(
+                    data: (state) => state.resultCount,
+                    orElse: () => results.length,
+                  );
+                  final hasMore = results.length < totalCount;
 
-                        return ListView.separated(
-                          controller: scrollController,
-                          itemCount: results.length + (hasMore ? 1 : 0),
-                          separatorBuilder: (_, index) => SizedBox(
-                            height: index == results.length - 1 && hasMore
-                                ? 10.r
-                                : 8.r,
-                          ),
-                          itemBuilder: (BuildContext context, int index) {
-                            if (index >= results.length) {
-                              return Padding(
-                                padding: EdgeInsets.symmetric(vertical: 6.r),
-                                child: Center(
-                                  child: Text(
-                                    '${results.length}/$totalCount',
-                                    style: context.textTheme.labelMedium
-                                        ?.copyWith(
-                                          color: context.colorScheme.onSurface
-                                              .withValues(alpha: 0.64),
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                  ),
-                                ),
-                              );
-                            }
-
-                            return _MemoryToolSearchResultTile(
-                              result: results[index],
-                            );
-                          },
-                        );
-                      },
-                      error: (error, _) =>
-                          RefError(onRetry: onRetry, error: error),
-                      loading: () => const Loading(),
+                  return ListView.separated(
+                    controller: scrollController,
+                    itemCount: results.length + (hasMore ? 1 : 0),
+                    separatorBuilder: (_, index) => SizedBox(
+                      height: index == results.length - 1 && hasMore
+                          ? 10.r
+                          : 8.r,
                     ),
-            ),
-          ],
-        ),
+                    itemBuilder: (BuildContext context, int index) {
+                      if (index >= results.length) {
+                        return Padding(
+                          padding: EdgeInsets.symmetric(vertical: 6.r),
+                          child: Center(
+                            child: Text(
+                              '${results.length}/$totalCount',
+                              style: context.textTheme.labelMedium?.copyWith(
+                                color: context.colorScheme.onSurface.withValues(
+                                  alpha: 0.64,
+                                ),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+
+                      return _MemoryToolSearchResultTile(
+                        result: results[index],
+                      );
+                    },
+                  );
+                },
+                error: (error, _) => RefError(onRetry: onRetry, error: error),
+                loading: () => const Loading(),
+              ),
       ),
     );
   }
