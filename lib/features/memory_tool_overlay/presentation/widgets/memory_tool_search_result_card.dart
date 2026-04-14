@@ -203,7 +203,10 @@ class MemoryToolSearchResultCard extends HookConsumerWidget {
                                 isSelected: selectionState.contains(
                                   result.address,
                                 ),
-                                onTap: () {
+                                onToggleSelection: () {
+                                  selectionNotifier.toggle(result);
+                                },
+                                onLongPress: () {
                                   selectionNotifier.toggle(result);
                                 },
                               );
@@ -265,7 +268,10 @@ class MemoryToolSearchResultCard extends HookConsumerWidget {
                                   isSelected: selectionState.contains(
                                     result.address,
                                   ),
-                                  onTap: () {
+                                  onToggleSelection: () {
+                                    selectionNotifier.toggle(result);
+                                  },
+                                  onLongPress: () {
                                     selectionNotifier.toggle(result);
                                   },
                                 );
@@ -422,12 +428,14 @@ class _MemoryToolSearchResultTile extends StatelessWidget {
   const _MemoryToolSearchResultTile({
     required this.result,
     required this.isSelected,
-    required this.onTap,
+    required this.onToggleSelection,
+    required this.onLongPress,
   });
 
   final SearchResult result;
   final bool isSelected;
-  final VoidCallback onTap;
+  final VoidCallback onToggleSelection;
+  final VoidCallback onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -435,7 +443,7 @@ class _MemoryToolSearchResultTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(14.r),
-        onTap: onTap,
+        onLongPress: onLongPress,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           decoration: BoxDecoration(
@@ -455,11 +463,24 @@ class _MemoryToolSearchResultTile extends StatelessWidget {
             children: <Widget>[
               Transform.scale(
                 scale: 0.9,
-                child: Checkbox(
-                  value: isSelected,
-                  onChanged: (_) => onTap(),
-                  visualDensity: VisualDensity.compact,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10.r),
+                  onTap: onToggleSelection,
+                  onLongPress: onToggleSelection,
+                  child: Padding(
+                    padding: EdgeInsets.all(2.r),
+                    child: Icon(
+                      isSelected
+                          ? Icons.check_box_rounded
+                          : Icons.check_box_outline_blank_rounded,
+                      size: 22.r,
+                      color: isSelected
+                          ? context.colorScheme.primary
+                          : context.colorScheme.onSurfaceVariant.withValues(
+                              alpha: 0.72,
+                            ),
+                    ),
+                  ),
                 ),
               ),
               SizedBox(width: 4.r),
