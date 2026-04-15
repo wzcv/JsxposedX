@@ -10,6 +10,7 @@ class MemoryToolSearchResultTile extends StatelessWidget {
     super.key,
     required this.result,
     required this.displayValue,
+    this.previousDisplayValue,
     required this.isSelected,
     required this.onToggleSelection,
     this.onTap,
@@ -18,6 +19,7 @@ class MemoryToolSearchResultTile extends StatelessWidget {
 
   final SearchResult result;
   final String displayValue;
+  final String? previousDisplayValue;
   final bool isSelected;
   final VoidCallback onToggleSelection;
   final VoidCallback? onTap;
@@ -25,6 +27,12 @@ class MemoryToolSearchResultTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final previousValue = previousDisplayValue?.trim();
+    final shouldShowPreviousValue =
+        previousValue != null &&
+        previousValue.isNotEmpty &&
+        previousValue != displayValue.trim();
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -94,6 +102,20 @@ class MemoryToolSearchResultTile extends StatelessWidget {
                                   color: context.colorScheme.primary,
                                 ),
                               ),
+                              if (shouldShowPreviousValue) ...<Widget>[
+                                SizedBox(height: 2.r),
+                                Text(
+                                  '${context.l10n.memoryToolResultPreviousValue}: $previousValue',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  softWrap: false,
+                                  style: context.textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: context.colorScheme.onSurface
+                                        .withValues(alpha: 0.62),
+                                  ),
+                                ),
+                              ],
                               SizedBox(height: 2.r),
                               MemoryToolResultBadge(
                                 label: mapMemoryToolSearchResultTypeLabel(
@@ -102,12 +124,12 @@ class MemoryToolSearchResultTile extends StatelessWidget {
                                 ),
                                 backgroundColor:
                                     mapMemoryToolSearchResultTypeBadgeBackground(
-                                  result.type,
-                                ),
+                                      result.type,
+                                    ),
                                 foregroundColor:
                                     mapMemoryToolSearchResultTypeBadgeForeground(
-                                  result.type,
-                                ),
+                                      result.type,
+                                    ),
                               ),
                             ],
                           ),
@@ -135,17 +157,17 @@ class MemoryToolSearchResultTile extends StatelessWidget {
                                 child: MemoryToolResultBadge(
                                   label:
                                       mapMemoryToolSearchResultRegionTypeLabel(
-                                    context,
-                                    result.regionTypeKey,
-                                  ),
+                                        context,
+                                        result.regionTypeKey,
+                                      ),
                                   backgroundColor:
                                       mapMemoryToolSearchResultRegionBadgeBackground(
-                                    result.regionTypeKey,
-                                  ),
+                                        result.regionTypeKey,
+                                      ),
                                   foregroundColor:
                                       mapMemoryToolSearchResultRegionBadgeForeground(
-                                    result.regionTypeKey,
-                                  ),
+                                        result.regionTypeKey,
+                                      ),
                                 ),
                               ),
                             ],
