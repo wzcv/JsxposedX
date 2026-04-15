@@ -4,10 +4,10 @@ import 'package:JsxposedX/core/extensions/context_extensions.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_search_dialog.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_search_result_card.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_search_task_feedback.dart';
-import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_search_task_overlay.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_action_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_query_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_search_provider.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_search_task_panel.dart';
 import 'package:JsxposedX/generated/memory_tool.g.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -154,11 +154,29 @@ class MemoryToolSearchTab extends HookConsumerWidget {
                   },
                 ),
               ),
-            MemoryToolSearchTaskOverlay(
-              taskStateAsync: taskStateAsync,
-              onCancel: () {
-                ref.read(memorySearchActionProvider.notifier).cancelSearch();
+            taskStateAsync.when(
+              skipLoadingOnRefresh: true,
+              data: (state) {
+                if (state.status != SearchTaskStatus.running) {
+                  return const SizedBox.shrink();
+                }
+
+                return Positioned.fill(
+                  child: ColoredBox(
+                    color: Colors.black.withValues(alpha: 0.34),
+                    child: MemoryToolSearchTaskPanel(
+                      state: state,
+                      onCancel: () {
+                        ref
+                            .read(memorySearchActionProvider.notifier)
+                            .cancelSearch();
+                      },
+                    ),
+                  ),
+                );
               },
+              error: (_, _) => const SizedBox.shrink(),
+              loading: () => const SizedBox.shrink(),
             ),
           ],
         );

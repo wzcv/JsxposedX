@@ -1,3 +1,4 @@
+import 'package:JsxposedX/common/widgets/overlay_window/overlay_panel_dialog.dart';
 import 'package:JsxposedX/core/extensions/context_extensions.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_action_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_query_provider.dart';
@@ -84,114 +85,92 @@ class MemoryToolSearchDialog extends HookConsumerWidget {
       }
     }
 
-    return Material(
-      color: Colors.black.withValues(alpha: 0.35),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onClose,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isLandscapeDialog =
-                constraints.maxWidth > constraints.maxHeight * 1.1;
-            final availableWidth = (constraints.maxWidth - 20.0)
-                .clamp(0.0, double.infinity)
-                .toDouble();
-            final availableHeight = constraints.maxHeight
-                .clamp(0.0, double.infinity)
-                .toDouble();
-            final dialogWidthCap = isLandscapeDialog ? 560.0 : 388.0;
-            final dialogHeightCap = isLandscapeDialog ? 420.0 : 520.0;
-            final dialogWidth = availableWidth < dialogWidthCap
-                ? availableWidth
-                : dialogWidthCap;
-            final dialogMaxHeight = isLandscapeDialog
-                ? availableHeight * 0.9
-                : (availableHeight < dialogHeightCap
-                      ? availableHeight
-                      : dialogHeightCap);
+    return OverlayPanelDialog(
+      onClose: onClose,
+      childBuilder: (context, viewport) {
+        final isLandscapeDialog = viewport.isLandscape;
+        final availableWidth = viewport.availableWidth;
+        final availableHeight = viewport.availableHeight;
+        final dialogWidthCap = isLandscapeDialog ? 560.0 : 388.0;
+        final dialogHeightCap = isLandscapeDialog ? 420.0 : 520.0;
+        final dialogWidth = availableWidth < dialogWidthCap
+            ? availableWidth
+            : dialogWidthCap;
+        final dialogMaxHeight = isLandscapeDialog
+            ? availableHeight * 0.9
+            : (availableHeight < dialogHeightCap
+                  ? availableHeight
+                  : dialogHeightCap);
 
-            if (dialogWidth <= 0 || dialogMaxHeight <= 0) {
-              return const SizedBox.shrink();
-            }
+        if (dialogWidth <= 0 || dialogMaxHeight <= 0) {
+          return const SizedBox.shrink();
+        }
 
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {},
-                  child: Material(
-                    color: context.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(18.r),
-                    clipBehavior: Clip.antiAlias,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: dialogWidth,
-                        maxHeight: dialogMaxHeight,
+        return Material(
+          color: context.colorScheme.surface,
+          borderRadius: BorderRadius.circular(18.r),
+          clipBehavior: Clip.antiAlias,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: dialogWidth,
+              maxHeight: dialogMaxHeight,
+            ),
+            child: SizedBox(
+              width: dialogWidth,
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(14.r),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    MemoryToolSearchToolbar(
+                      canRunFirstScan: canRunFirstScan,
+                      canRunNextScan: canRunNextScan,
+                      canReset: canReset,
+                      onFirstScan: () {
+                        runAndClose(searchFormNotifier.firstScan);
+                      },
+                      onNextScan: () {
+                        runAndClose(searchFormNotifier.nextScan);
+                      },
+                      onReset: () {
+                        runAndClose(searchFormNotifier.resetSearchSession);
+                      },
+                    ),
+                    SizedBox(height: 12.r),
+                    if (selectedProcess != null) ...<Widget>[
+                      MemoryToolSearchSessionCard(
+                        sessionStateAsync: sessionStateAsync,
+                        selectedPid: selectedProcess.pid,
                       ),
-                      child: SizedBox(
-                        width: dialogWidth,
-                        child: SingleChildScrollView(
-                          padding: EdgeInsets.all(14.r),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              MemoryToolSearchToolbar(
-                                canRunFirstScan: canRunFirstScan,
-                                canRunNextScan: canRunNextScan,
-                                canReset: canReset,
-                                onFirstScan: () {
-                                  runAndClose(searchFormNotifier.firstScan);
-                                },
-                                onNextScan: () {
-                                  runAndClose(searchFormNotifier.nextScan);
-                                },
-                                onReset: () {
-                                  runAndClose(
-                                    searchFormNotifier.resetSearchSession,
-                                  );
-                                },
-                              ),
-                              SizedBox(height: 12.r),
-                              if (selectedProcess != null) ...<Widget>[
-                                MemoryToolSearchSessionCard(
-                                  sessionStateAsync: sessionStateAsync,
-                                  selectedPid: selectedProcess.pid,
-                                ),
-                                SizedBox(height: 12.r),
-                              ],
-                              MemoryToolSearchFormCard(
-                                valueController: valueController,
-                                state: searchFormState,
-                                actionState: searchActionState,
-                                hasRunningTask: hasRunningTask,
-                                onValueChanged: searchFormNotifier.updateValue,
-                                onValueCategoryChanged:
-                                    searchFormNotifier.updateValueCategory,
-                                onValueTypeOptionChanged:
-                                    searchFormNotifier.updateValueTypeOption,
-                                onRangePresetChanged:
-                                    searchFormNotifier.updateRangePreset,
-                                onCustomRangeSectionToggled:
-                                    searchFormNotifier.toggleCustomRangeSection,
-                                onEndianChanged: searchFormNotifier.updateEndian,
-                                taskStatus: MemoryToolSearchTaskFeedback(
-                                  taskStateAsync: taskStateAsync,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                      SizedBox(height: 12.r),
+                    ],
+                    MemoryToolSearchFormCard(
+                      valueController: valueController,
+                      state: searchFormState,
+                      actionState: searchActionState,
+                      hasRunningTask: hasRunningTask,
+                      onValueChanged: searchFormNotifier.updateValue,
+                      onValueCategoryChanged:
+                          searchFormNotifier.updateValueCategory,
+                      onValueTypeOptionChanged:
+                          searchFormNotifier.updateValueTypeOption,
+                      onRangePresetChanged:
+                          searchFormNotifier.updateRangePreset,
+                      onCustomRangeSectionToggled:
+                          searchFormNotifier.toggleCustomRangeSection,
+                      onEndianChanged: searchFormNotifier.updateEndian,
+                      taskStatus: MemoryToolSearchTaskFeedback(
+                        taskStateAsync: taskStateAsync,
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ),
-            );
-          },
-        ),
-      ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

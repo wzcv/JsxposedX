@@ -6,7 +6,9 @@ import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/me
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_process_terminated_dialog.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/process_avatar.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/process_picker_dialog.dart';
-import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/selected_process_panel.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/pages/tabs/memory_tool_edit_tab.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/pages/tabs/memory_tool_search_tab.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/pages/tabs/memory_tool_watch_tab.dart';
 import 'package:JsxposedX/features/overlay_window/domain/models/overlay_window_presentation.dart';
 import 'package:JsxposedX/features/overlay_window/presentation/providers/overlay_window_host_runtime_provider.dart';
 import 'package:JsxposedX/generated/memory_tool.g.dart';
@@ -225,7 +227,24 @@ class MemoryToolOverlay extends HookConsumerWidget {
             padding: EdgeInsets.only(top: portraitTopInset),
             body: PageStorage(
               bucket: _pageStorageBucket,
-              child: SelectedProcessPanel(selectedProcess: selectedProcess),
+              child: selectedProcess == null
+                  ? Center(
+                      child: Text(
+                        context.l10n.selectApp,
+                        style: TextStyle(
+                          color: context.colorScheme.onSurface.withValues(
+                            alpha: 0.65,
+                          ),
+                        ),
+                      ),
+                    )
+                  : const TabBarView(
+                      children: <Widget>[
+                        MemoryToolSearchTab(),
+                        MemoryToolEditTab(),
+                        MemoryToolWatchTab(),
+                      ],
+                    ),
             ),
           ),
           if (isPickerVisible.value)
