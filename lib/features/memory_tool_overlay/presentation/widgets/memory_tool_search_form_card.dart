@@ -101,14 +101,9 @@ class MemoryToolSearchFormCard extends StatelessWidget {
         ),
         if (state.selectedRangePreset !=
             MemorySearchRangePresetEnum.all) ...<Widget>[
-          SizedBox(height: 10.r),
-          _InlineHint(
-            message: context.l10n.memoryToolRangePresetPendingHint,
-            color: context.colorScheme.onSurfaceVariant,
-          ),
+          SizedBox(height: 12.r),
         ],
         if (state.shouldShowCustomRangeSections) ...<Widget>[
-          SizedBox(height: 12.r),
           _FieldLabel(label: context.l10n.memoryToolFieldRangeSection),
           SizedBox(height: 6.r),
           _MemoryToolCustomRangeSectionWrap(
