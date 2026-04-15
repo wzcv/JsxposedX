@@ -33,44 +33,7 @@ class MemoryToolSearchResultDialog extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(
-                displayValue,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: context.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  color: context.colorScheme.primary,
-                ),
-              ),
-              SizedBox(height: 12.r),
-              _MemoryToolSearchResultDialogLine(
-                label: 'Address',
-                value: formatMemoryToolSearchResultAddress(result.address),
-              ),
-              SizedBox(height: 8.r),
-              _MemoryToolSearchResultDialogLine(
-                label: 'Type',
-                value: mapMemoryToolSearchResultTypeLabel(
-                  type: result.type,
-                  displayValue: displayValue,
-                ),
-              ),
-              SizedBox(height: 8.r),
-              _MemoryToolSearchResultDialogLine(
-                label: 'Region',
-                value: mapMemoryToolSearchResultRegionTypeLabel(
-                  context,
-                  result.regionTypeKey,
-                ),
-              ),
-              SizedBox(height: 12.r),
-              Text(
-                'TODO',
-                style: context.textTheme.bodySmall?.copyWith(
-                  color: context.colorScheme.onSurface.withValues(alpha: 0.64),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              Text(result.toString()),
               SizedBox(height: 14.r),
               Align(
                 alignment: Alignment.centerRight,
@@ -83,44 +46,6 @@ class MemoryToolSearchResultDialog extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _MemoryToolSearchResultDialogLine extends StatelessWidget {
-  const _MemoryToolSearchResultDialogLine({
-    required this.label,
-    required this.value,
-  });
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        SizedBox(
-          width: 58.r,
-          child: Text(
-            label,
-            style: context.textTheme.bodySmall?.copyWith(
-              color: context.colorScheme.onSurface.withValues(alpha: 0.62),
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        SizedBox(width: 8.r),
-        Expanded(
-          child: Text(
-            value,
-            style: context.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
