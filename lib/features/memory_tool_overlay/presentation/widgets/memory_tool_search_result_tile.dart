@@ -102,12 +102,12 @@ class MemoryToolSearchResultTile extends StatelessWidget {
                                 ),
                                 backgroundColor:
                                     mapMemoryToolSearchResultTypeBadgeBackground(
-                                      result.type,
-                                    ),
+                                  result.type,
+                                ),
                                 foregroundColor:
                                     mapMemoryToolSearchResultTypeBadgeForeground(
-                                      result.type,
-                                    ),
+                                  result.type,
+                                ),
                               ),
                             ],
                           ),
@@ -135,17 +135,17 @@ class MemoryToolSearchResultTile extends StatelessWidget {
                                 child: MemoryToolResultBadge(
                                   label:
                                       mapMemoryToolSearchResultRegionTypeLabel(
-                                        context,
-                                        result.regionTypeKey,
-                                      ),
+                                    context,
+                                    result.regionTypeKey,
+                                  ),
                                   backgroundColor:
                                       mapMemoryToolSearchResultRegionBadgeBackground(
-                                        result.regionTypeKey,
-                                      ),
+                                    result.regionTypeKey,
+                                  ),
                                   foregroundColor:
                                       mapMemoryToolSearchResultRegionBadgeForeground(
-                                        result.regionTypeKey,
-                                      ),
+                                    result.regionTypeKey,
+                                  ),
                                 ),
                               ),
                             ],

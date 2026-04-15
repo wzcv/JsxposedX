@@ -87,6 +87,18 @@ typedef OverlayPanelDialogBuilder = Widget Function(
   OverlayPanelViewport viewport,
 );
 
+typedef OverlayPanelCardDialogBuilder = Widget Function(
+  BuildContext context,
+  OverlayPanelViewport viewport,
+  OverlayPanelLayout layout,
+);
+
+typedef OverlayPanelScaledCardDialogBuilder = Widget Function(
+  BuildContext context,
+  OverlayPanelViewport viewport,
+  OverlayPanelScaledLayout scaledLayout,
+);
+
 class OverlayPanelLayout {
   const OverlayPanelLayout({
     required this.width,
@@ -171,14 +183,168 @@ class OverlayPanelDialog extends StatelessWidget {
     this.barrierOpacity = 0.35,
     this.padding = const EdgeInsets.symmetric(horizontal: 12.0),
     this.alignment = Alignment.center,
-  });
+  }) : _cardBuilder = null,
+       _scaledCardBuilder = null,
+       maxWidthPortrait = null,
+       maxWidthLandscape = null,
+       maxHeightPortrait = null,
+       maxHeightLandscape = null,
+       portraitBaseSize = null,
+       landscapeBaseSize = null,
+       landscapeHeightFactor = 0.9,
+       minScalePortrait = 0.5,
+       minScaleLandscape = 0.66,
+       maxScale = 1.0,
+       cardColor = null,
+       cardBorderRadius = 18.0,
+       scaledCardBorderRadiusBuilder = null,
+       cardMinWidth = null,
+       cardMaxWidth = null,
+       fillCardHeight = false;
 
-  final OverlayPanelDialogBuilder childBuilder;
+  const OverlayPanelDialog.card({
+    super.key,
+    required OverlayPanelCardDialogBuilder childBuilder,
+    required this.maxWidthPortrait,
+    required this.maxWidthLandscape,
+    required this.maxHeightPortrait,
+    required this.maxHeightLandscape,
+    this.onClose,
+    this.barrierDismissible = true,
+    this.barrierOpacity = 0.35,
+    this.padding = const EdgeInsets.symmetric(horizontal: 12.0),
+    this.alignment = Alignment.center,
+    this.landscapeHeightFactor = 0.9,
+    this.cardColor,
+    this.cardBorderRadius = 18.0,
+    this.cardMinWidth,
+    this.cardMaxWidth,
+    this.fillCardHeight = false,
+  }) : childBuilder = null,
+       _cardBuilder = childBuilder,
+       _scaledCardBuilder = null,
+       portraitBaseSize = null,
+       landscapeBaseSize = null,
+       minScalePortrait = 0.5,
+       minScaleLandscape = 0.66,
+       maxScale = 1.0,
+       scaledCardBorderRadiusBuilder = null;
+
+  const OverlayPanelDialog.scaledCard({
+    super.key,
+    required OverlayPanelScaledCardDialogBuilder childBuilder,
+    required this.maxWidthPortrait,
+    required this.maxWidthLandscape,
+    required this.maxHeightPortrait,
+    required this.maxHeightLandscape,
+    required this.portraitBaseSize,
+    required this.landscapeBaseSize,
+    this.onClose,
+    this.barrierDismissible = true,
+    this.barrierOpacity = 0.35,
+    this.padding = const EdgeInsets.symmetric(horizontal: 12.0),
+    this.alignment = Alignment.center,
+    this.landscapeHeightFactor = 0.9,
+    this.minScalePortrait = 0.5,
+    this.minScaleLandscape = 0.66,
+    this.maxScale = 1.0,
+    this.cardColor,
+    this.cardBorderRadius = 18.0,
+    this.scaledCardBorderRadiusBuilder,
+    this.cardMinWidth,
+    this.cardMaxWidth,
+    this.fillCardHeight = false,
+  }) : childBuilder = null,
+       _cardBuilder = null,
+       _scaledCardBuilder = childBuilder;
+
+  final OverlayPanelDialogBuilder? childBuilder;
+  final OverlayPanelCardDialogBuilder? _cardBuilder;
+  final OverlayPanelScaledCardDialogBuilder? _scaledCardBuilder;
   final VoidCallback? onClose;
   final bool barrierDismissible;
   final double barrierOpacity;
   final EdgeInsetsGeometry padding;
   final Alignment alignment;
+  final double? maxWidthPortrait;
+  final double? maxWidthLandscape;
+  final double? maxHeightPortrait;
+  final double? maxHeightLandscape;
+  final Size? portraitBaseSize;
+  final Size? landscapeBaseSize;
+  final double landscapeHeightFactor;
+  final double minScalePortrait;
+  final double minScaleLandscape;
+  final double maxScale;
+  final Color? cardColor;
+  final double cardBorderRadius;
+  final double Function(OverlayPanelScaledLayout scaledLayout)?
+  scaledCardBorderRadiusBuilder;
+  final double? cardMinWidth;
+  final double? cardMaxWidth;
+  final bool fillCardHeight;
+
+  Widget _buildOverlayChild(
+    BuildContext context,
+    OverlayPanelViewport viewport,
+  ) {
+    if (_scaledCardBuilder case final scaledCardBuilder?) {
+      final scaledLayout = viewport.resolveScaledLayout(
+        maxWidthPortrait: maxWidthPortrait!,
+        maxWidthLandscape: maxWidthLandscape!,
+        maxHeightPortrait: maxHeightPortrait!,
+        maxHeightLandscape: maxHeightLandscape!,
+        portraitBaseSize: portraitBaseSize!,
+        landscapeBaseSize: landscapeBaseSize!,
+        landscapeHeightFactor: landscapeHeightFactor,
+        minScalePortrait: minScalePortrait,
+        minScaleLandscape: minScaleLandscape,
+        maxScale: maxScale,
+      );
+
+      if (scaledLayout == null) {
+        return const SizedBox.shrink();
+      }
+
+      return OverlayPanelCard(
+        layout: scaledLayout.layout,
+        color: cardColor,
+        borderRadius:
+            scaledCardBorderRadiusBuilder?.call(scaledLayout) ??
+            cardBorderRadius,
+        minWidth: cardMinWidth,
+        maxWidth: cardMaxWidth,
+        height: fillCardHeight ? scaledLayout.layout.maxHeight : null,
+        child: scaledCardBuilder(context, viewport, scaledLayout),
+      );
+    }
+
+    if (_cardBuilder case final cardBuilder?) {
+      final layout = viewport.resolveLayout(
+        maxWidthPortrait: maxWidthPortrait!,
+        maxWidthLandscape: maxWidthLandscape!,
+        maxHeightPortrait: maxHeightPortrait!,
+        maxHeightLandscape: maxHeightLandscape!,
+        landscapeHeightFactor: landscapeHeightFactor,
+      );
+
+      if (layout == null) {
+        return const SizedBox.shrink();
+      }
+
+      return OverlayPanelCard(
+        layout: layout,
+        color: cardColor,
+        borderRadius: cardBorderRadius,
+        minWidth: cardMinWidth,
+        maxWidth: cardMaxWidth,
+        height: fillCardHeight ? layout.maxHeight : null,
+        child: cardBuilder(context, viewport, layout),
+      );
+    }
+
+    return childBuilder!(context, viewport);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -198,7 +364,7 @@ class OverlayPanelDialog extends StatelessWidget {
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: () {},
-                  child: childBuilder(context, viewport),
+                  child: _buildOverlayChild(context, viewport),
                 ),
               ),
             );

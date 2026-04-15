@@ -20,76 +20,66 @@ class MemoryToolResultSelectionDialog extends HookWidget {
   Widget build(BuildContext context) {
     final controller = useTextEditingController(text: initialLimit.toString());
 
-    return OverlayPanelDialog(
+    return OverlayPanelDialog.card(
       onClose: onClose,
       barrierOpacity: 0.32,
-      childBuilder: (context, viewport) {
-        final layout = viewport.resolveLayout(
-          maxWidthPortrait: 280.r,
-          maxWidthLandscape: 280.r,
-          maxHeightPortrait: 220.r,
-          maxHeightLandscape: 220.r,
-          landscapeHeightFactor: 1.0,
-        );
-
-        if (layout == null) {
-          return const SizedBox.shrink();
-        }
-
-        return OverlayPanelCard(
-          layout: layout,
-          minWidth: 220.r,
-          maxWidth: 280.r,
-          borderRadius: 16.r,
-          child: Padding(
-            padding: EdgeInsets.all(12.r),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                TextField(
-                  controller: controller,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    hintText: initialLimit.toString(),
-                    filled: true,
-                    fillColor: context.colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.42),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12.r),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 12.r,
-                      vertical: 12.r,
-                    ),
+      maxWidthPortrait: 280.r,
+      maxWidthLandscape: 280.r,
+      maxHeightPortrait: 220.r,
+      maxHeightLandscape: 220.r,
+      landscapeHeightFactor: 1.0,
+      cardMinWidth: 220.r,
+      cardMaxWidth: 280.r,
+      cardBorderRadius: 16.r,
+      childBuilder: (context, viewport, layout) {
+        return Padding(
+          padding: EdgeInsets.all(12.r),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  hintText: initialLimit.toString(),
+                  filled: true,
+                  fillColor: context.colorScheme.surfaceContainerHighest
+                      .withValues(alpha: 0.42),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12.r),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12.r,
+                    vertical: 12.r,
                   ),
                 ),
-                SizedBox(height: 10.r),
-                Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: onClose,
-                        child: Text(context.l10n.cancel),
-                      ),
+              ),
+              SizedBox(height: 10.r),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: onClose,
+                      child: Text(context.l10n.cancel),
                     ),
-                    SizedBox(width: 10.r),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: () {
-                          final parsed = int.tryParse(controller.text.trim());
-                          if (parsed == null || parsed <= 0) {
-                            return;
-                          }
-                          onConfirm(parsed);
-                        },
-                        child: Text(context.l10n.save),
-                      ),
+                  ),
+                  SizedBox(width: 10.r),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () {
+                        final parsed = int.tryParse(controller.text.trim());
+                        if (parsed == null || parsed <= 0) {
+                          return;
+                        }
+                        onConfirm(parsed);
+                      },
+                      child: Text(context.l10n.save),
                     ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
+            ],
           ),
         );
       },

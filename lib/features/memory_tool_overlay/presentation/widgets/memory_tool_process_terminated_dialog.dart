@@ -13,57 +13,47 @@ class MemoryToolProcessTerminatedDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OverlayPanelDialog(
+    return OverlayPanelDialog.card(
       barrierDismissible: false,
-      childBuilder: (context, viewport) {
-        final layout = viewport.resolveLayout(
-          maxWidthPortrait: 372.0,
-          maxWidthLandscape: 520.0,
-          maxHeightPortrait: 280.0,
-          maxHeightLandscape: 248.0,
-        );
-
-        if (layout == null) {
-          return const SizedBox.shrink();
-        }
-
-        return OverlayPanelCard(
-          layout: layout,
-          borderRadius: 18.r,
-          child: Padding(
-            padding: EdgeInsets.all(16.r),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  context.l10n.memoryToolProcessTerminatedTitle,
-                  style: context.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
+      maxWidthPortrait: 372.0,
+      maxWidthLandscape: 520.0,
+      maxHeightPortrait: 280.0,
+      maxHeightLandscape: 248.0,
+      cardBorderRadius: 18.r,
+      childBuilder: (context, viewport, layout) {
+        return Padding(
+          padding: EdgeInsets.all(16.r),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                context.l10n.memoryToolProcessTerminatedTitle,
+                style: context.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              SizedBox(height: 10.r),
+              Text(
+                context.l10n.memoryToolProcessTerminatedDescription,
+                style: context.textTheme.bodyMedium?.copyWith(
+                  color: context.colorScheme.onSurface.withValues(
+                    alpha: 0.74,
+                  ),
+                  height: 1.45,
+                ),
+              ),
+              SizedBox(height: 16.r),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton(
+                  onPressed: onConfirm,
+                  child: Text(
+                    context.l10n.memoryToolProcessTerminatedAction,
                   ),
                 ),
-                SizedBox(height: 10.r),
-                Text(
-                  context.l10n.memoryToolProcessTerminatedDescription,
-                  style: context.textTheme.bodyMedium?.copyWith(
-                    color: context.colorScheme.onSurface.withValues(
-                      alpha: 0.74,
-                    ),
-                    height: 1.45,
-                  ),
-                ),
-                SizedBox(height: 16.r),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: FilledButton(
-                    onPressed: onConfirm,
-                    child: Text(
-                      context.l10n.memoryToolProcessTerminatedAction,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },

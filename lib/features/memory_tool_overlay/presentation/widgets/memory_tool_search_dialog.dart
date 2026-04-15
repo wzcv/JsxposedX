@@ -85,72 +85,62 @@ class MemoryToolSearchDialog extends HookConsumerWidget {
       }
     }
 
-    return OverlayPanelDialog(
+    return OverlayPanelDialog.card(
       onClose: onClose,
-      childBuilder: (context, viewport) {
-        final layout = viewport.resolveLayout(
-          maxWidthPortrait: 388.0,
-          maxWidthLandscape: 560.0,
-          maxHeightPortrait: 520.0,
-          maxHeightLandscape: 420.0,
-        );
-
-        if (layout == null) {
-          return const SizedBox.shrink();
-        }
-
-        return OverlayPanelCard(
-          layout: layout,
-          borderRadius: 18.r,
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(14.r),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                MemoryToolSearchToolbar(
-                  canRunFirstScan: canRunFirstScan,
-                  canRunNextScan: canRunNextScan,
-                  canReset: canReset,
-                  onFirstScan: () {
-                    runAndClose(searchFormNotifier.firstScan);
-                  },
-                  onNextScan: () {
-                    runAndClose(searchFormNotifier.nextScan);
-                  },
-                  onReset: () {
-                    runAndClose(searchFormNotifier.resetSearchSession);
-                  },
+      maxWidthPortrait: 388.0,
+      maxWidthLandscape: 560.0,
+      maxHeightPortrait: 520.0,
+      maxHeightLandscape: 420.0,
+      cardBorderRadius: 18.r,
+      childBuilder: (context, viewport, layout) {
+        return SingleChildScrollView(
+          padding: EdgeInsets.all(14.r),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              MemoryToolSearchToolbar(
+                canRunFirstScan: canRunFirstScan,
+                canRunNextScan: canRunNextScan,
+                canReset: canReset,
+                onFirstScan: () {
+                  runAndClose(searchFormNotifier.firstScan);
+                },
+                onNextScan: () {
+                  runAndClose(searchFormNotifier.nextScan);
+                },
+                onReset: () {
+                  runAndClose(searchFormNotifier.resetSearchSession);
+                },
+              ),
+              SizedBox(height: 12.r),
+              if (selectedProcess != null) ...<Widget>[
+                MemoryToolSearchSessionCard(
+                  sessionStateAsync: sessionStateAsync,
+                  selectedPid: selectedProcess.pid,
                 ),
                 SizedBox(height: 12.r),
-                if (selectedProcess != null) ...<Widget>[
-                  MemoryToolSearchSessionCard(
-                    sessionStateAsync: sessionStateAsync,
-                    selectedPid: selectedProcess.pid,
-                  ),
-                  SizedBox(height: 12.r),
-                ],
-                MemoryToolSearchFormCard(
-                  valueController: valueController,
-                  state: searchFormState,
-                  actionState: searchActionState,
-                  hasRunningTask: hasRunningTask,
-                  onValueChanged: searchFormNotifier.updateValue,
-                  onValueCategoryChanged:
-                      searchFormNotifier.updateValueCategory,
-                  onValueTypeOptionChanged:
-                      searchFormNotifier.updateValueTypeOption,
-                  onRangePresetChanged:
-                      searchFormNotifier.updateRangePreset,
-                  onCustomRangeSectionToggled:
-                      searchFormNotifier.toggleCustomRangeSection,
-                  onEndianChanged: searchFormNotifier.updateEndian,
-                  taskStatus: MemoryToolSearchTaskFeedback(
-                    taskStateAsync: taskStateAsync,
-                  ),
-                ),
               ],
-            ),
+              MemoryToolSearchFormCard(
+                valueController: valueController,
+                state: searchFormState,
+                actionState: searchActionState,
+                hasRunningTask: hasRunningTask,
+                onValueChanged: searchFormNotifier.updateValue,
+                onValueCategoryChanged:
+                    searchFormNotifier.updateValueCategory,
+                onValueTypeOptionChanged:
+                    searchFormNotifier.updateValueTypeOption,
+                onRangePresetChanged:
+                    searchFormNotifier.updateRangePreset,
+                onCustomRangeSectionToggled:
+                    searchFormNotifier.toggleCustomRangeSection,
+                onEndianChanged: searchFormNotifier.updateEndian,
+                taskStatus: MemoryToolSearchTaskFeedback(
+                  taskStateAsync: taskStateAsync,
+                ),
+              ),
+            ],
           ),
         );
       },
