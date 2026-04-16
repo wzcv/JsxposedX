@@ -141,7 +141,7 @@ final class CurrentSearchResultsProvider
 }
 
 String _$currentSearchResultsHash() =>
-    r'cc703a3bce0b47c4bf7d21d9300b6eba7d633692';
+    r'9ee3aa19905020badfd4764dc6e98126067c8136';
 
 @ProviderFor(MemoryToolSearchForm)
 const memoryToolSearchFormProvider = MemoryToolSearchFormProvider._();

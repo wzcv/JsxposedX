@@ -81,6 +81,7 @@ class MemorySearchAction extends _$MemorySearchAction {
           .read(memoryActionRepositoryProvider)
           .firstScan(request: request);
       ref.read(memoryValueHistoryProvider.notifier).clear();
+      ref.read(memoryToolRemovedResultProvider.notifier).clear();
       _invalidateSearchQueries();
     });
   }
@@ -106,6 +107,7 @@ class MemorySearchAction extends _$MemorySearchAction {
     state = await AsyncValue.guard(() async {
       await ref.read(memoryActionRepositoryProvider).resetSearchSession();
       ref.read(memoryValueHistoryProvider.notifier).clear();
+      ref.read(memoryToolRemovedResultProvider.notifier).clear();
       _invalidateSearchQueries();
     });
   }

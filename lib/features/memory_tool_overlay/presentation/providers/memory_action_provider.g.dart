@@ -138,7 +138,7 @@ final class MemorySearchActionProvider
 }
 
 String _$memorySearchActionHash() =>
-    r'c47e6fbd2935bb917667cfb22b508806aba97ff2';
+    r'9094564fab2ed69723c4bcda0431e4a22773745f';
 
 abstract class _$MemorySearchAction extends $Notifier<AsyncValue<void>> {
   AsyncValue<void> build();

@@ -13,6 +13,7 @@ class MemoryToolSearchResultTile extends StatelessWidget {
     this.previousDisplayValue,
     required this.isSelected,
     required this.onToggleSelection,
+    required this.onDeleteRecord,
     this.onTap,
     this.onLongProcess,
   });
@@ -22,6 +23,7 @@ class MemoryToolSearchResultTile extends StatelessWidget {
   final String? previousDisplayValue;
   final bool isSelected;
   final VoidCallback onToggleSelection;
+  final VoidCallback onDeleteRecord;
   final VoidCallback? onTap;
   final VoidCallback? onLongProcess;
 
@@ -81,7 +83,7 @@ class MemoryToolSearchResultTile extends StatelessWidget {
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final valueMaxWidth = constraints.maxWidth * 0.58;
+                    final valueMaxWidth = constraints.maxWidth * 0.52;
 
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -171,6 +173,22 @@ class MemoryToolSearchResultTile extends StatelessWidget {
                                 ),
                               ),
                             ],
+                          ),
+                        ),
+                        SizedBox(width: 6.r),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(10.r),
+                          onTap: onDeleteRecord,
+                          child: SizedBox(
+                            width: 28.r,
+                            height: 28.r,
+                            child: Icon(
+                              Icons.delete_outline_rounded,
+                              size: 18.r,
+                              color: context.colorScheme.error.withValues(
+                                alpha: 0.84,
+                              ),
+                            ),
                           ),
                         ),
                       ],

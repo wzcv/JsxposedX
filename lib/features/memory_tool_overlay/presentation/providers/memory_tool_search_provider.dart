@@ -47,22 +47,46 @@ AsyncValue<List<SearchResult>> currentSearchResults(Ref ref) {
   final renderLimit = ref.watch(
     memoryToolResultSelectionProvider.select((state) => state.selectionLimit),
   );
+  final removedAddresses = ref.watch(
+    memoryToolRemovedResultProvider.select((state) => state.removedAddresses),
+  );
   if (!hasMatchingSession) {
     return const AsyncData<List<SearchResult>>(<SearchResult>[]);
   }
 
-  return ref.watch(
-    getSearchResultsProvider(
-      offset: 0,
-      limit: renderLimit,
-    ),
-  );
+  return ref
+      .watch(getSearchResultsProvider(offset: 0, limit: renderLimit))
+      .whenData(
+        (results) => results
+            .where((result) => !removedAddresses.contains(result.address))
+            .take(renderLimit)
+            .toList(growable: false),
+      );
 }
 
-final memoryToolResultSelectionProvider = NotifierProvider<
-  MemoryToolResultSelectionController,
-  MemoryToolResultSelectionState
->(MemoryToolResultSelectionController.new);
+class MemoryToolRemovedResultState {
+  const MemoryToolRemovedResultState({this.removedAddresses = const <int>{}});
+
+  final Set<int> removedAddresses;
+
+  MemoryToolRemovedResultState copyWith({Set<int>? removedAddresses}) {
+    return MemoryToolRemovedResultState(
+      removedAddresses: removedAddresses ?? this.removedAddresses,
+    );
+  }
+}
+
+final memoryToolResultSelectionProvider =
+    NotifierProvider<
+      MemoryToolResultSelectionController,
+      MemoryToolResultSelectionState
+    >(MemoryToolResultSelectionController.new);
+
+final memoryToolRemovedResultProvider =
+    NotifierProvider<
+      MemoryToolRemovedResultController,
+      MemoryToolRemovedResultState
+    >(MemoryToolRemovedResultController.new);
 
 final currentSearchResultLivePreviewsProvider =
     FutureProvider.autoDispose<Map<int, MemoryValuePreview>>((ref) async {
@@ -73,16 +97,27 @@ final currentSearchResultLivePreviewsProvider =
         ),
       );
       final renderLimit = ref.watch(
-        memoryToolResultSelectionProvider.select((state) => state.selectionLimit),
+        memoryToolResultSelectionProvider.select(
+          (state) => state.selectionLimit,
+        ),
+      );
+      final removedAddresses = ref.watch(
+        memoryToolRemovedResultProvider.select(
+          (state) => state.removedAddresses,
+        ),
       );
 
       if (!hasMatchingSession || !isPanelVisible) {
         return const <int, MemoryValuePreview>{};
       }
 
-      final results = await ref.watch(
+      final rawResults = await ref.watch(
         getSearchResultsProvider(offset: 0, limit: renderLimit).future,
       );
+      final results = rawResults
+          .where((result) => !removedAddresses.contains(result.address))
+          .take(renderLimit)
+          .toList(growable: false);
       if (results.isEmpty) {
         return const <int, MemoryValuePreview>{};
       }
@@ -173,6 +208,43 @@ class MemoryToolResultSelectionController
     }
     state = state.copyWith(selectedAddresses: const <int>[]);
   }
+
+  void removeAddress(int address) {
+    if (!state.selectedAddresses.contains(address)) {
+      return;
+    }
+
+    state = state.copyWith(
+      selectedAddresses: state.selectedAddresses
+          .where((selectedAddress) => selectedAddress != address)
+          .toList(growable: false),
+    );
+  }
+}
+
+class MemoryToolRemovedResultController
+    extends Notifier<MemoryToolRemovedResultState> {
+  @override
+  MemoryToolRemovedResultState build() {
+    return const MemoryToolRemovedResultState();
+  }
+
+  void remove(int address) {
+    if (state.removedAddresses.contains(address)) {
+      return;
+    }
+
+    state = state.copyWith(
+      removedAddresses: <int>{...state.removedAddresses, address},
+    );
+  }
+
+  void clear() {
+    if (state.removedAddresses.isEmpty) {
+      return;
+    }
+    state = const MemoryToolRemovedResultState();
+  }
 }
 
 MemoryReadRequest _buildMemoryReadRequestFromResult(SearchResult result) {
@@ -197,7 +269,8 @@ class MemoryToolSearchForm extends _$MemoryToolSearchForm {
   void updateValueCategory(MemorySearchValueCategoryEnum category) {
     final defaultOption = memorySearchCategoryDefaults[category];
     final advancedOptions =
-        memorySearchAdvancedValueOptions[MemorySearchValueCategoryEnum.advanced] ??
+        memorySearchAdvancedValueOptions[MemorySearchValueCategoryEnum
+            .advanced] ??
         const <MemorySearchValueTypeOptionEnum>[];
     final isSwitchingToText =
         category == MemorySearchValueCategoryEnum.text &&
@@ -351,13 +424,25 @@ class MemoryToolSearchForm extends _$MemoryToolSearchForm {
 
     switch (option) {
       case MemorySearchValueTypeOptionEnum.i8:
-        return _validateIntegerValue(type: SearchValueType.i8, rawValue: trimmedValue);
+        return _validateIntegerValue(
+          type: SearchValueType.i8,
+          rawValue: trimmedValue,
+        );
       case MemorySearchValueTypeOptionEnum.i16:
-        return _validateIntegerValue(type: SearchValueType.i16, rawValue: trimmedValue);
+        return _validateIntegerValue(
+          type: SearchValueType.i16,
+          rawValue: trimmedValue,
+        );
       case MemorySearchValueTypeOptionEnum.i32:
-        return _validateIntegerValue(type: SearchValueType.i32, rawValue: trimmedValue);
+        return _validateIntegerValue(
+          type: SearchValueType.i32,
+          rawValue: trimmedValue,
+        );
       case MemorySearchValueTypeOptionEnum.i64:
-        return _validateIntegerValue(type: SearchValueType.i64, rawValue: trimmedValue);
+        return _validateIntegerValue(
+          type: SearchValueType.i64,
+          rawValue: trimmedValue,
+        );
       case MemorySearchValueTypeOptionEnum.xor:
         return _validateXorValue(trimmedValue);
       case MemorySearchValueTypeOptionEnum.f32:
@@ -383,8 +468,10 @@ class MemoryToolSearchForm extends _$MemoryToolSearchForm {
     final (min, max) = switch (type) {
       SearchValueType.i8 => (BigInt.from(-128), BigInt.from(127)),
       SearchValueType.i16 => (BigInt.from(-32768), BigInt.from(32767)),
-      SearchValueType.i32 =>
-        (BigInt.from(-2147483648), BigInt.from(2147483647)),
+      SearchValueType.i32 => (
+        BigInt.from(-2147483648),
+        BigInt.from(2147483647),
+      ),
       SearchValueType.i64 => (
         BigInt.parse('-9223372036854775808'),
         BigInt.parse('9223372036854775807'),

@@ -39,6 +39,7 @@ class MemoryToolSearchResultCard extends HookConsumerWidget {
       currentSearchResultLivePreviewsProvider,
     );
     final valueHistoryState = ref.watch(memoryValueHistoryProvider);
+    final removedResultState = ref.watch(memoryToolRemovedResultProvider);
     final selectedPid = ref.watch(memoryToolSelectedProcessProvider)?.pid;
     final isSettingsVisible = useState(false);
     final isBatchEditVisible = useState(false);
@@ -51,7 +52,13 @@ class MemoryToolSearchResultCard extends HookConsumerWidget {
       orElse: () => const <SearchResult>[],
     );
     final resultCount = sessionStateAsync.maybeWhen(
-      data: (state) => state.resultCount,
+      data: (state) {
+        final removedCount = removedResultState.removedAddresses.length;
+        if (state.resultCount <= removedCount) {
+          return 0;
+        }
+        return state.resultCount - removedCount;
+      },
       orElse: () => displayedResults.length,
     );
     final pageCount = selectionState.selectionLimit <= 0

@@ -10,7 +10,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-class MemoryToolSearchResultList extends HookWidget {
+class MemoryToolSearchResultList extends HookConsumerWidget {
   const MemoryToolSearchResultList({
     super.key,
     required this.listStorageKey,
@@ -29,11 +29,14 @@ class MemoryToolSearchResultList extends HookWidget {
   final Map<int, String> previousValueByAddress;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final activeResultDialog =
         useState<({SearchResult result, String displayValue})?>(null);
     final activeResultActionDialog =
         useState<({SearchResult result, String displayValue})?>(null);
+    final removedResultNotifier = ref.read(
+      memoryToolRemovedResultProvider.notifier,
+    );
 
     return Stack(
       children: <Widget>[
@@ -56,6 +59,10 @@ class MemoryToolSearchResultList extends HookWidget {
               isSelected: selectionState.contains(result.address),
               onToggleSelection: () {
                 selectionNotifier.toggle(result);
+              },
+              onDeleteRecord: () {
+                selectionNotifier.removeAddress(result.address);
+                removedResultNotifier.remove(result.address);
               },
               onTap: () {
                 activeResultActionDialog.value = null;
