@@ -164,6 +164,36 @@ class MemoryToolNativeImpl(val context: Context) : MemoryToolNative {
         }
     }
 
+    override fun isProcessPaused(pid: Long, callback: (Result<Boolean>) -> Unit) {
+        scope.launch {
+            try {
+                val result = memoryTool.isProcessPaused(pid)
+                withContext(Dispatchers.Main) {
+                    callback(Result.success(result))
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    callback(Result.failure(e))
+                }
+            }
+        }
+    }
+
+    override fun setProcessPaused(pid: Long, paused: Boolean, callback: (Result<Unit>) -> Unit) {
+        scope.launch {
+            try {
+                memoryTool.setProcessPaused(pid, paused)
+                withContext(Dispatchers.Main) {
+                    callback(Result.success(Unit))
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    callback(Result.failure(e))
+                }
+            }
+        }
+    }
+
     override fun firstScan(request: FirstScanRequest, callback: (Result<Unit>) -> Unit) {
         scope.launch {
             try {

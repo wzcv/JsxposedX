@@ -2078,7 +2078,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Start multi-select and batch operations from the current result.';
 
   @override
-  String get memoryToolResultActionBatchEdit => 'Batch Edit Entry';
+  String get memoryToolResultActionBatchEdit => 'Batch Edit';
 
   @override
   String get memoryToolResultActionBatchEditHint =>

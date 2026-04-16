@@ -4031,7 +4031,7 @@ abstract class AppLocalizations {
   /// No description provided for @memoryToolResultActionBatchEdit.
   ///
   /// In zh, this message translates to:
-  /// **'批量修改入口'**
+  /// **'批量修改'**
   String get memoryToolResultActionBatchEdit;
 
   /// No description provided for @memoryToolResultActionBatchEditHint.

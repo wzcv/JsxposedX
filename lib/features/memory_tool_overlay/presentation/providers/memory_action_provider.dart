@@ -22,21 +22,22 @@ MemoryActionRepository memoryActionRepository(Ref ref) {
   return MemoryActionRepositoryImpl(dataSource: dataSource);
 }
 
-final currentFrozenMemoryValuesProvider =
-    FutureProvider.autoDispose<List<FrozenMemoryValue>>((ref) async {
-      return await ref
-          .watch(memoryActionRepositoryProvider)
-          .getFrozenMemoryValues();
-    });
+@riverpod
+Future<List<FrozenMemoryValue>> currentFrozenMemoryValues(Ref ref) async {
+  return await ref
+      .watch(memoryActionRepositoryProvider)
+      .getFrozenMemoryValues();
+}
 
-final memoryValueHistoryProvider =
-    NotifierProvider<
-      MemoryValueHistoryController,
-      Map<int, MemoryToolValueHistoryEntryState>
-    >(MemoryValueHistoryController.new);
+@riverpod
+Future<bool> processPaused(Ref ref, {required int pid}) async {
+  return await ref
+      .watch(memoryActionRepositoryProvider)
+      .isProcessPaused(pid: pid);
+}
 
-class MemoryValueHistoryController
-    extends Notifier<Map<int, MemoryToolValueHistoryEntryState>> {
+@Riverpod(keepAlive: true)
+class MemoryValueHistory extends _$MemoryValueHistory {
   @override
   Map<int, MemoryToolValueHistoryEntryState> build() {
     return const <int, MemoryToolValueHistoryEntryState>{};
@@ -307,5 +308,33 @@ class MemoryValueAction extends _$MemoryValueAction {
     ref.invalidate(readMemoryValuesProvider);
     ref.invalidate(currentSearchResultLivePreviewsProvider);
     ref.invalidate(currentFrozenMemoryValuesProvider);
+  }
+}
+
+@Riverpod(keepAlive: true)
+class MemoryProcessControlAction extends _$MemoryProcessControlAction {
+  @override
+  AsyncValue<void> build() {
+    return const AsyncValue.data(null);
+  }
+
+  Future<void> setProcessPaused({
+    required int pid,
+    required bool paused,
+  }) async {
+    state = const AsyncValue.loading();
+    final nextState = await AsyncValue.guard(() async {
+      await ref
+          .read(memoryActionRepositoryProvider)
+          .setProcessPaused(pid: pid, paused: paused);
+      ref.invalidate(processPausedProvider(pid: pid));
+    });
+    state = nextState;
+    if (nextState.hasError) {
+      Error.throwWithStackTrace(
+        nextState.error!,
+        nextState.asError!.stackTrace,
+      );
+    }
   }
 }

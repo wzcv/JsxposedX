@@ -856,6 +856,8 @@ interface MemoryToolNative {
   fun writeMemoryValue(request: MemoryWriteRequest, callback: (Result<Unit>) -> Unit)
   fun setMemoryFreeze(request: MemoryFreezeRequest, callback: (Result<Unit>) -> Unit)
   fun getFrozenMemoryValues(callback: (Result<List<FrozenMemoryValue>>) -> Unit)
+  fun isProcessPaused(pid: Long, callback: (Result<Boolean>) -> Unit)
+  fun setProcessPaused(pid: Long, paused: Boolean, callback: (Result<Unit>) -> Unit)
   fun firstScan(request: FirstScanRequest, callback: (Result<Unit>) -> Unit)
   fun nextScan(request: NextScanRequest, callback: (Result<Unit>) -> Unit)
   fun cancelSearch(callback: (Result<Unit>) -> Unit)
@@ -1057,6 +1059,46 @@ interface MemoryToolNative {
               } else {
                 val data = result.getOrNull()
                 reply.reply(MemoryToolNativePigeonUtils.wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.JsxposedX.MemoryToolNative.isProcessPaused$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val pidArg = args[0] as Long
+            api.isProcessPaused(pidArg) { result: Result<Boolean> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(MemoryToolNativePigeonUtils.wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(MemoryToolNativePigeonUtils.wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.JsxposedX.MemoryToolNative.setProcessPaused$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val pidArg = args[0] as Long
+            val pausedArg = args[1] as Boolean
+            api.setProcessPaused(pidArg, pausedArg) { result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(MemoryToolNativePigeonUtils.wrapError(error))
+              } else {
+                reply.reply(MemoryToolNativePigeonUtils.wrapResult(null))
               }
             }
           }

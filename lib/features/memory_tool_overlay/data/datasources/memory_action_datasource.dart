@@ -30,4 +30,15 @@ class MemoryActionDatasource {
   Future<List<FrozenMemoryValue>> getFrozenMemoryValues() async {
     return await _native.getFrozenMemoryValues();
   }
+
+  Future<bool> isProcessPaused({required int pid}) async {
+    return await _native.isProcessPaused(pid);
+  }
+
+  Future<void> setProcessPaused({
+    required int pid,
+    required bool paused,
+  }) async {
+    await _native.setProcessPaused(pid, paused);
+  }
 }

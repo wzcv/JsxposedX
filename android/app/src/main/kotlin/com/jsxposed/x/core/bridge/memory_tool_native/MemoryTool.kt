@@ -114,6 +114,36 @@ class MemoryTool(private val context: Context) {
         return daemonClient.getFrozenMemoryValues()
     }
 
+    fun isProcessPaused(pid: Long): Boolean {
+        require(pid > 0) { "Invalid process id." }
+        val statusOutput = Shell(su = true).execute("cat /proc/$pid/status")
+        if (statusOutput.isBlank()) {
+            throw IllegalStateException("Failed to read process status.")
+        }
+        if (statusOutput.startsWith("ERROR") || statusOutput.startsWith("EXCEPTION")) {
+            throw IllegalStateException(statusOutput)
+        }
+
+        val stateLine = statusOutput.lineSequence()
+            .map { it.trim() }
+            .firstOrNull { it.startsWith("State:") }
+            ?: return false
+        val stateCode = stateLine.removePrefix("State:")
+            .trim()
+            .firstOrNull()
+            ?: return false
+        return stateCode == 'T' || stateCode == 't'
+    }
+
+    fun setProcessPaused(pid: Long, paused: Boolean) {
+        require(pid > 0) { "Invalid process id." }
+        val signal = if (paused) "-STOP" else "-CONT"
+        val output = Shell(su = true).execute("kill $signal $pid")
+        if (output.startsWith("ERROR") || output.startsWith("EXCEPTION")) {
+            throw IllegalStateException(output)
+        }
+    }
+
     fun firstScan(request: FirstScanRequest) {
         daemonClient.firstScan(request)
     }

@@ -5,9 +5,13 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 class MemoryToolResultSelectionBar extends StatelessWidget {
   const MemoryToolResultSelectionBar({
     super.key,
+    required this.hasProcess,
+    required this.isProcessPaused,
+    required this.isProcessPauseLoading,
     required this.hasVisibleResults,
     required this.hasSelection,
     required this.canRestorePrevious,
+    required this.onToggleProcessPaused,
     required this.onSelectAll,
     required this.onInvert,
     required this.onClear,
@@ -18,9 +22,13 @@ class MemoryToolResultSelectionBar extends StatelessWidget {
     required this.onOpenSearch,
   });
 
+  final bool hasProcess;
+  final bool isProcessPaused;
+  final bool isProcessPauseLoading;
   final bool hasVisibleResults;
   final bool hasSelection;
   final bool canRestorePrevious;
+  final VoidCallback onToggleProcessPaused;
   final VoidCallback onSelectAll;
   final VoidCallback onInvert;
   final VoidCallback onClear;
@@ -59,6 +67,15 @@ class MemoryToolResultSelectionBar extends StatelessWidget {
                     _MemoryToolResultSelectionAction(
                       icon: Icons.search_rounded,
                       onTap: onOpenSearch,
+                    ),
+                    const _MemoryToolResultSelectionDivider(),
+                    _MemoryToolResultSelectionAction(
+                      icon: isProcessPaused
+                          ? Icons.play_arrow_rounded
+                          : Icons.pause_rounded,
+                      onTap: hasProcess && !isProcessPauseLoading
+                          ? onToggleProcessPaused
+                          : null,
                     ),
                     const _MemoryToolResultSelectionDivider(),
                     _MemoryToolResultSelectionAction(

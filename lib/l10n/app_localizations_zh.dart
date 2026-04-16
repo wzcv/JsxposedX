@@ -2036,7 +2036,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get memoryToolResultActionStartMultiSelectHint => '从当前结果开始进行多选和批量操作。';
 
   @override
-  String get memoryToolResultActionBatchEdit => '批量修改入口';
+  String get memoryToolResultActionBatchEdit => '批量修改';
 
   @override
   String get memoryToolResultActionBatchEditHint => '为后续批量写入和筛选后的编辑预留入口。';

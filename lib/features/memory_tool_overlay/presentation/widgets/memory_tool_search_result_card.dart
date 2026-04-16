@@ -44,6 +44,10 @@ class MemoryToolSearchResultCard extends HookConsumerWidget {
       memoryToolRemovedResultProvider.notifier,
     );
     final selectedPid = ref.watch(memoryToolSelectedProcessProvider)?.pid;
+    final processPausedAsync = selectedPid == null
+        ? const AsyncValue.data(false)
+        : ref.watch(processPausedProvider(pid: selectedPid));
+    final processControlState = ref.watch(memoryProcessControlActionProvider);
     final isSettingsVisible = useState(false);
     final isBatchEditVisible = useState(false);
 
@@ -91,9 +95,33 @@ class MemoryToolSearchResultCard extends HookConsumerWidget {
           child: Column(
             children: <Widget>[
               MemoryToolResultSelectionBar(
+                hasProcess: selectedPid != null,
+                isProcessPaused: processPausedAsync.asData?.value ?? false,
+                isProcessPauseLoading:
+                    processControlState.isLoading ||
+                    processPausedAsync.isLoading,
                 hasVisibleResults: visibleResults.isNotEmpty,
                 hasSelection: selectedResults.isNotEmpty,
                 canRestorePrevious: canRestorePrevious,
+                onToggleProcessPaused: () async {
+                  if (selectedPid == null) {
+                    return;
+                  }
+
+                  try {
+                    final isPaused = processPausedAsync.asData?.value ?? false;
+                    await ref
+                        .read(memoryProcessControlActionProvider.notifier)
+                        .setProcessPaused(pid: selectedPid, paused: !isPaused);
+                  } catch (error) {
+                    if (!context.mounted) {
+                      return;
+                    }
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(error.toString())));
+                  }
+                },
                 onSelectAll: () {
                   selectionNotifier.selectVisible(visibleResults);
                 },

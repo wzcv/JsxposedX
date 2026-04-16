@@ -967,7 +967,7 @@
   "memoryToolResultActionSelectCurrentHint": "Add the current result to the selection set for later unified actions.",
   "memoryToolResultActionStartMultiSelect": "Enter Multi-Select",
   "memoryToolResultActionStartMultiSelectHint": "Start multi-select and batch operations from the current result.",
-  "memoryToolResultActionBatchEdit": "Batch Edit Entry",
+  "memoryToolResultActionBatchEdit": "Batch Edit",
   "memoryToolResultActionBatchEditHint": "Reserve an entry point for future batch write and filtered edit flows.",
   "memoryToolResultActionAddWatch": "Add to Watch List",
   "memoryToolResultActionAddWatchHint": "Add the current result to the watch area for continuous observation.",

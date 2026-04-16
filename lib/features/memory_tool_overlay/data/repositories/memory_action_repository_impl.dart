@@ -42,4 +42,17 @@ class MemoryActionRepositoryImpl implements MemoryActionRepository {
   Future<List<FrozenMemoryValue>> getFrozenMemoryValues() async {
     return await _dataSource.getFrozenMemoryValues();
   }
+
+  @override
+  Future<bool> isProcessPaused({required int pid}) async {
+    return await _dataSource.isProcessPaused(pid: pid);
+  }
+
+  @override
+  Future<void> setProcessPaused({
+    required int pid,
+    required bool paused,
+  }) async {
+    await _dataSource.setProcessPaused(pid: pid, paused: paused);
+  }
 }

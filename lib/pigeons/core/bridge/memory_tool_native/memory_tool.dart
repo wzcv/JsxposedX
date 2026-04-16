@@ -141,10 +141,7 @@ class MemoryWriteRequest {
   final int address;
   final SearchValue value;
 
-  const MemoryWriteRequest({
-    required this.address,
-    required this.value,
-  });
+  const MemoryWriteRequest({required this.address, required this.value});
 }
 
 class MemoryFreezeRequest {
@@ -258,6 +255,12 @@ abstract class MemoryToolNative {
 
   @async
   List<FrozenMemoryValue> getFrozenMemoryValues();
+
+  @async
+  bool isProcessPaused(int pid);
+
+  @async
+  void setProcessPaused(int pid, bool paused);
 
   @async
   void firstScan(FirstScanRequest request);

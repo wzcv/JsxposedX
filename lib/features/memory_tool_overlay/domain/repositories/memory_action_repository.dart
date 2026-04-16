@@ -14,4 +14,8 @@ abstract class MemoryActionRepository {
   Future<void> setMemoryFreeze({required MemoryFreezeRequest request});
 
   Future<List<FrozenMemoryValue>> getFrozenMemoryValues();
+
+  Future<bool> isProcessPaused({required int pid});
+
+  Future<void> setProcessPaused({required int pid, required bool paused});
 }
