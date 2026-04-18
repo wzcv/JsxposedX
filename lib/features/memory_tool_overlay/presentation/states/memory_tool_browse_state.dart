@@ -8,6 +8,7 @@ class MemoryToolBrowseState {
     this.results = const <SearchResult>[],
     this.selectionState = const MemoryToolResultSelectionState(),
     this.hiddenAddresses = const <int>{},
+    this.focusRequestId = 0,
     this.topNextStep = 1,
     this.bottomNextStep = 1,
     this.isInitializing = false,
@@ -23,6 +24,7 @@ class MemoryToolBrowseState {
   final List<SearchResult> results;
   final MemoryToolResultSelectionState selectionState;
   final Set<int> hiddenAddresses;
+  final int focusRequestId;
   final int topNextStep;
   final int bottomNextStep;
   final bool isInitializing;
@@ -53,6 +55,7 @@ class MemoryToolBrowseState {
     List<SearchResult>? results,
     MemoryToolResultSelectionState? selectionState,
     Set<int>? hiddenAddresses,
+    int? focusRequestId,
     int? topNextStep,
     int? bottomNextStep,
     bool? isInitializing,
@@ -69,6 +72,7 @@ class MemoryToolBrowseState {
       results: results ?? this.results,
       selectionState: selectionState ?? this.selectionState,
       hiddenAddresses: hiddenAddresses ?? this.hiddenAddresses,
+      focusRequestId: focusRequestId ?? this.focusRequestId,
       topNextStep: topNextStep ?? this.topNextStep,
       bottomNextStep: bottomNextStep ?? this.bottomNextStep,
       isInitializing: isInitializing ?? this.isInitializing,

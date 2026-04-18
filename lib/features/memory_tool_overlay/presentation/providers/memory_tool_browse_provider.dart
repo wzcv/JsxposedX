@@ -75,6 +75,138 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
       return;
     }
 
+    final anchorRawBytes = _resolveAnchorRawBytes(
+      preview: preview,
+      result: result,
+    );
+    final nextAnchorResult = _resolveNextAnchorResult(
+      currentResults: state.results,
+      result: result,
+      preview: preview,
+      displayValue: displayValue,
+      rawBytes: anchorRawBytes,
+    );
+    final nextAnchorRegion = _resolveRegionForAddress(
+      regions: state.regions,
+      address: nextAnchorResult.address,
+      strideBytes: nextAnchorResult.rawBytes.isEmpty
+          ? 1
+          : nextAnchorResult.rawBytes.length,
+    );
+    if (_canReuseCurrentWindow(
+      state: state,
+      anchorResult: nextAnchorResult,
+    )) {
+      final nextHiddenAddresses = <int>{
+        ...state.hiddenAddresses,
+      }..remove(nextAnchorResult.address);
+      final nextResults = _replaceBrowseResult(
+        state.results,
+        nextAnchorResult,
+      );
+      final paginationState = _resolveBrowsePaginationState(
+        anchorAddress: nextAnchorResult.address,
+        strideBytes: nextAnchorResult.rawBytes.isEmpty
+            ? 1
+            : nextAnchorResult.rawBytes.length,
+        regions: state.regions,
+        loadedResults: nextResults,
+      );
+      state = state.copyWith(
+        anchorResult: nextAnchorResult,
+        results: nextResults,
+        hiddenAddresses: nextHiddenAddresses,
+        selectionState: const MemoryToolResultSelectionState(),
+        focusRequestId: state.focusRequestId + 1,
+        isInitializing: false,
+        isLoadingAbove: false,
+        isLoadingBelow: false,
+        topNextStep: paginationState.topNextStep,
+        bottomNextStep: paginationState.bottomNextStep,
+        reachedTopBoundary: paginationState.reachedTopBoundary,
+        reachedBottomBoundary: paginationState.reachedBottomBoundary,
+        clearErrorText: true,
+      );
+      return;
+    }
+
+    if (_canReuseCurrentRegion(
+      state: state,
+      anchorResult: nextAnchorResult,
+      anchorRegion: nextAnchorRegion,
+    )) {
+      try {
+        final nextResults = await _extendResultsAroundAnchor(
+          anchorResult: nextAnchorResult,
+          anchorRegion: nextAnchorRegion!,
+          existingResults: state.results,
+        );
+        final nextHiddenAddresses = <int>{
+          ...state.hiddenAddresses,
+        }..remove(nextAnchorResult.address);
+        final paginationState = _resolveBrowsePaginationState(
+          anchorAddress: nextAnchorResult.address,
+          strideBytes: nextAnchorResult.rawBytes.isEmpty
+              ? 1
+              : nextAnchorResult.rawBytes.length,
+          regions: state.regions,
+          loadedResults: nextResults,
+        );
+        state = state.copyWith(
+          anchorResult: nextAnchorResult,
+          results: nextResults,
+          hiddenAddresses: nextHiddenAddresses,
+          selectionState: const MemoryToolResultSelectionState(),
+          focusRequestId: state.focusRequestId + 1,
+          isInitializing: false,
+          isLoadingAbove: false,
+          isLoadingBelow: false,
+          topNextStep: paginationState.topNextStep,
+          bottomNextStep: paginationState.bottomNextStep,
+          reachedTopBoundary: paginationState.reachedTopBoundary,
+          reachedBottomBoundary: paginationState.reachedBottomBoundary,
+          clearErrorText: true,
+        );
+        return;
+      } catch (error) {
+        state = state.copyWith(errorText: error.toString());
+      }
+    }
+
+    if (_canReuseKnownRegions(
+      state: state,
+      anchorResult: nextAnchorResult,
+      anchorRegion: nextAnchorRegion,
+    )) {
+      final nextHiddenAddresses = <int>{
+        ...state.hiddenAddresses,
+      }..remove(nextAnchorResult.address);
+      state = state.copyWith(
+        isInitializing: true,
+        isLoadingAbove: false,
+        isLoadingBelow: false,
+        clearErrorText: true,
+      );
+      try {
+        final nextState = await _buildWindowState(
+          anchorResult: nextAnchorResult,
+          readableRegions: state.regions,
+          preservedHiddenAddresses: nextHiddenAddresses,
+        );
+        state = nextState.copyWith(
+          isInitializing: false,
+          clearErrorText: true,
+          focusRequestId: state.focusRequestId + 1,
+        );
+        return;
+      } catch (error) {
+        state = state.copyWith(
+          isInitializing: false,
+          errorText: error.toString(),
+        );
+      }
+    }
+
     state = state.copyWith(
       isInitializing: true,
       isLoadingAbove: false,
@@ -100,24 +232,16 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
         return;
       }
 
-      final anchorRawBytes = _resolveAnchorRawBytes(
-        preview: preview,
-        result: result,
-      );
-      final anchorResult = SearchResult(
-        address: result.address,
-        regionStart: result.regionStart,
-        regionTypeKey: result.regionTypeKey,
-        type: preview?.type ?? result.type,
-        rawBytes: anchorRawBytes,
-        displayValue: preview?.displayValue ?? displayValue,
-      );
       final nextState = await _buildWindowState(
-        anchorResult: anchorResult,
+        anchorResult: nextAnchorResult,
         readableRegions: readableRegions,
         preservedHiddenAddresses: const <int>{},
       );
-      state = nextState.copyWith(isInitializing: false, clearErrorText: true);
+      state = nextState.copyWith(
+        isInitializing: false,
+        clearErrorText: true,
+        focusRequestId: state.focusRequestId + 1,
+      );
     } catch (error) {
       state = state.copyWith(
         isInitializing: false,
@@ -145,7 +269,11 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
         readableRegions: state.regions,
         preservedHiddenAddresses: state.hiddenAddresses,
       );
-      state = nextState.copyWith(isInitializing: false, clearErrorText: true);
+      state = nextState.copyWith(
+        isInitializing: false,
+        clearErrorText: true,
+        focusRequestId: state.focusRequestId + 1,
+      );
     } catch (error) {
       state = state.copyWith(
         isInitializing: false,
@@ -500,6 +628,212 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
       );
     }
     return results;
+  }
+
+  Future<List<SearchResult>> _extendResultsAroundAnchor({
+    required SearchResult anchorResult,
+    required MemoryRegion anchorRegion,
+    required List<SearchResult> existingResults,
+  }) async {
+    final strideBytes = anchorResult.rawBytes.isEmpty
+        ? 1
+        : anchorResult.rawBytes.length;
+    final localRegions = <MemoryRegion>[anchorRegion];
+    final aboveCollected = _collectAlignedAddresses(
+      anchorAddress: anchorResult.address,
+      strideBytes: strideBytes,
+      startStep: 1,
+      targetCount: _memoryToolBrowseInitialExpandCount,
+      isAbove: true,
+      regions: localRegions,
+    );
+    final belowCollected = _collectAlignedAddresses(
+      anchorAddress: anchorResult.address,
+      strideBytes: strideBytes,
+      startStep: 1,
+      targetCount: _memoryToolBrowseInitialExpandCount,
+      isAbove: false,
+      regions: localRegions,
+    );
+    final aboveResults = await _readBrowseResults(
+      anchorResult: anchorResult,
+      readableRegions: localRegions,
+      addresses: aboveCollected.addresses.reversed.toList(growable: false),
+    );
+    final belowResults = await _readBrowseResults(
+      anchorResult: anchorResult,
+      readableRegions: localRegions,
+      addresses: belowCollected.addresses,
+    );
+    return _mergeBrowseResults(
+      existingResults,
+      <SearchResult>[...aboveResults, anchorResult, ...belowResults],
+    );
+  }
+}
+
+SearchResult _resolveNextAnchorResult({
+  required List<SearchResult> currentResults,
+  required SearchResult result,
+  required MemoryValuePreview? preview,
+  required String displayValue,
+  required Uint8List rawBytes,
+}) {
+  final matchedResult = currentResults
+      .where((item) => item.address == result.address)
+      .isEmpty
+      ? null
+      : currentResults.firstWhere((item) => item.address == result.address);
+  return SearchResult(
+    address: result.address,
+    regionStart: matchedResult?.regionStart ?? result.regionStart,
+    regionTypeKey: matchedResult?.regionTypeKey ?? result.regionTypeKey,
+    type: preview?.type ?? result.type,
+    rawBytes: rawBytes,
+    displayValue: preview?.displayValue ?? displayValue,
+  );
+}
+
+bool _canReuseCurrentWindow({
+  required MemoryToolBrowseState state,
+  required SearchResult anchorResult,
+}) {
+  if (!state.hasAnchor ||
+      state.regions.isEmpty ||
+      state.results.isEmpty ||
+      state.isInitializing) {
+    return false;
+  }
+
+  if (state.browseType != anchorResult.type ||
+      state.strideBytes != anchorResult.rawBytes.length) {
+    return false;
+  }
+
+  return state.results.any((result) => result.address == anchorResult.address);
+}
+
+bool _canReuseCurrentRegion({
+  required MemoryToolBrowseState state,
+  required SearchResult anchorResult,
+  required MemoryRegion? anchorRegion,
+}) {
+  if (!_hasCompatibleBrowseShape(state: state, anchorResult: anchorResult) ||
+      anchorRegion == null ||
+      state.anchorResult == null) {
+    return false;
+  }
+  return anchorRegion.startAddress == state.anchorResult!.regionStart;
+}
+
+bool _canReuseKnownRegions({
+  required MemoryToolBrowseState state,
+  required SearchResult anchorResult,
+  required MemoryRegion? anchorRegion,
+}) {
+  return _hasCompatibleBrowseShape(state: state, anchorResult: anchorResult) &&
+      anchorRegion != null;
+}
+
+bool _hasCompatibleBrowseShape({
+  required MemoryToolBrowseState state,
+  required SearchResult anchorResult,
+}) {
+  if (!state.hasAnchor ||
+      state.regions.isEmpty ||
+      state.results.isEmpty ||
+      state.isInitializing) {
+    return false;
+  }
+
+  if (state.browseType != anchorResult.type ||
+      state.strideBytes != anchorResult.rawBytes.length) {
+    return false;
+  }
+
+  return true;
+}
+
+List<SearchResult> _replaceBrowseResult(
+  List<SearchResult> results,
+  SearchResult nextResult,
+) {
+  return results
+      .map(
+        (result) => result.address == nextResult.address ? nextResult : result,
+      )
+      .toList(growable: false);
+}
+
+({
+  int topNextStep,
+  int bottomNextStep,
+  bool reachedTopBoundary,
+  bool reachedBottomBoundary,
+}) _resolveBrowsePaginationState({
+  required int anchorAddress,
+  required int strideBytes,
+  required List<MemoryRegion> regions,
+  required List<SearchResult> loadedResults,
+}) {
+  final loadedAddresses = loadedResults.map((result) => result.address).toSet();
+  final aboveState = _resolveNextStep(
+    anchorAddress: anchorAddress,
+    strideBytes: strideBytes,
+    regions: regions,
+    loadedAddresses: loadedAddresses,
+    isAbove: true,
+  );
+  final belowState = _resolveNextStep(
+    anchorAddress: anchorAddress,
+    strideBytes: strideBytes,
+    regions: regions,
+    loadedAddresses: loadedAddresses,
+    isAbove: false,
+  );
+  return (
+    topNextStep: aboveState.nextStep,
+    bottomNextStep: belowState.nextStep,
+    reachedTopBoundary: aboveState.reachedBoundary,
+    reachedBottomBoundary: belowState.reachedBoundary,
+  );
+}
+
+({int nextStep, bool reachedBoundary}) _resolveNextStep({
+  required int anchorAddress,
+  required int strideBytes,
+  required List<MemoryRegion> regions,
+  required Set<int> loadedAddresses,
+  required bool isAbove,
+}) {
+  if (regions.isEmpty) {
+    return (nextStep: 1, reachedBoundary: true);
+  }
+
+  final minReadableAddress = regions.first.startAddress;
+  final maxReadableAddress = regions.last.endAddress;
+  var nextStep = 1;
+
+  while (true) {
+    final candidate = isAbove
+        ? anchorAddress - (nextStep * strideBytes)
+        : anchorAddress + (nextStep * strideBytes);
+    final isOutOfTopBoundary = candidate < minReadableAddress;
+    final isOutOfBottomBoundary = candidate + strideBytes > maxReadableAddress;
+    if (isOutOfTopBoundary || isOutOfBottomBoundary) {
+      return (nextStep: nextStep, reachedBoundary: true);
+    }
+
+    final hasValidRegion = _resolveRegionForAddress(
+          regions: regions,
+          address: candidate,
+          strideBytes: strideBytes,
+        ) !=
+        null;
+    if (hasValidRegion && !loadedAddresses.contains(candidate)) {
+      return (nextStep: nextStep, reachedBoundary: false);
+    }
+    nextStep += 1;
   }
 }
 

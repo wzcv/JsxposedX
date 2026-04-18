@@ -49,7 +49,6 @@ class MemoryToolOverlay extends HookConsumerWidget {
     final mediaQuery = MediaQuery.of(context);
     final isPortrait = mediaQuery.orientation == Orientation.portrait;
     final portraitTopInset = isPortrait ? mediaQuery.padding.top : 0.0;
-
     void openProcessPicker() {
       ref.invalidate(
         getProcessInfoProvider(

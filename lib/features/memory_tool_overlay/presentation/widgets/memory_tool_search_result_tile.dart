@@ -15,7 +15,7 @@ class MemoryToolSearchResultTile extends StatelessWidget {
     this.isAnchor = false,
     required this.isSelected,
     required this.onToggleSelection,
-    required this.onDeleteRecord,
+    this.onDeleteRecord,
     this.onTap,
     this.onLongProcess,
   });
@@ -27,7 +27,7 @@ class MemoryToolSearchResultTile extends StatelessWidget {
   final bool isAnchor;
   final bool isSelected;
   final VoidCallback onToggleSelection;
-  final VoidCallback onDeleteRecord;
+  final VoidCallback? onDeleteRecord;
   final VoidCallback? onTap;
   final VoidCallback? onLongProcess;
 
@@ -198,22 +198,24 @@ class MemoryToolSearchResultTile extends StatelessWidget {
                             ],
                           ),
                         ),
-                        SizedBox(width: 6.r),
-                        InkWell(
-                          borderRadius: BorderRadius.circular(10.r),
-                          onTap: onDeleteRecord,
-                          child: SizedBox(
-                            width: 28.r,
-                            height: 28.r,
-                            child: Icon(
-                              Icons.delete_outline_rounded,
-                              size: 18.r,
-                              color: context.colorScheme.error.withValues(
-                                alpha: 0.84,
+                        if (onDeleteRecord != null) ...<Widget>[
+                          SizedBox(width: 6.r),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(10.r),
+                            onTap: onDeleteRecord,
+                            child: SizedBox(
+                              width: 28.r,
+                              height: 28.r,
+                              child: Icon(
+                                Icons.delete_outline_rounded,
+                                size: 18.r,
+                                color: context.colorScheme.error.withValues(
+                                  alpha: 0.84,
+                                ),
                               ),
                             ),
                           ),
-                        ),
+                        ],
                       ],
                     );
                   },

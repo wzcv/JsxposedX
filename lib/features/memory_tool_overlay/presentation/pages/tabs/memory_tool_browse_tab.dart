@@ -5,15 +5,14 @@ import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/me
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_query_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_browse_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_saved_items_provider.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_browse_result_list.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_batch_edit_dialog.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_result_calculator_dialog.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_result_selection_bar.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_result_selection_dialog.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_result_stats_bar.dart';
-import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_search_result_list.dart';
 import 'package:JsxposedX/generated/memory_tool.g.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -26,9 +25,13 @@ class MemoryToolBrowseTab extends HookConsumerWidget {
     useAutomaticKeepAlive();
     final selectedProcess = ref.watch(memoryToolSelectedProcessProvider);
     final browseState = ref.watch(memoryToolBrowseControllerProvider);
-    final browseNotifier = ref.read(memoryToolBrowseControllerProvider.notifier);
+    final browseNotifier = ref.read(
+      memoryToolBrowseControllerProvider.notifier,
+    );
     final visibleResults = ref.watch(currentBrowseResultsProvider);
-    final livePreviewsAsync = ref.watch(currentBrowseResultLivePreviewsProvider);
+    final livePreviewsAsync = ref.watch(
+      currentBrowseResultLivePreviewsProvider,
+    );
     final valueHistoryState = ref.watch(memoryValueHistoryProvider);
     final frozenValuesAsync = ref.watch(currentFrozenMemoryValuesProvider);
     final processControlState = ref.watch(memoryProcessControlActionProvider);
@@ -39,88 +42,13 @@ class MemoryToolBrowseTab extends HookConsumerWidget {
     final isSettingsVisible = useState(false);
     final isBatchEditVisible = useState(false);
     final isCalculatorVisible = useState(false);
-    final scrollController = useScrollController();
-    final previousAnchorAddress = useRef<int?>(null);
-    final anchorItemKey = useMemoized(
-      () => GlobalKey(debugLabel: 'memory_tool_browse_anchor'),
-      [browseState.anchorAddress],
-    );
+    final scrollController = useMemoized(() => ScrollController(), [
+      browseState.focusRequestId,
+    ]);
 
-    bool centerAnchorInViewport() {
-      if (!scrollController.hasClients || browseState.anchorAddress == null) {
-        return false;
-      }
-
-      final anchorContext = anchorItemKey.currentContext;
-      if (anchorContext != null) {
-        final renderObject = anchorContext.findRenderObject();
-        if (renderObject != null && scrollController.position.hasContentDimensions) {
-          final viewport = RenderAbstractViewport.maybeOf(renderObject);
-          if (viewport != null) {
-            final revealedOffset = viewport.getOffsetToReveal(
-              renderObject,
-              0.5,
-            );
-            final targetOffset = revealedOffset.offset.clamp(
-              0.0,
-              scrollController.position.maxScrollExtent,
-            );
-            if ((scrollController.offset - targetOffset).abs() > 0.5) {
-              scrollController.jumpTo(targetOffset);
-            }
-            return true;
-          }
-        }
-      }
-
-      final anchorIndex = visibleResults.indexWhere(
-        (result) => result.address == browseState.anchorAddress,
-      );
-      if (anchorIndex < 0) {
-        return false;
-      }
-      final estimatedItemExtent = 94.r;
-      final viewportDimension = scrollController.position.viewportDimension;
-      final estimatedOffset =
-          (anchorIndex * estimatedItemExtent) -
-          ((viewportDimension - estimatedItemExtent) / 2);
-      final targetOffset = estimatedOffset.clamp(
-        0.0,
-        scrollController.position.maxScrollExtent,
-      );
-      if ((scrollController.offset - targetOffset).abs() > 0.5) {
-        scrollController.jumpTo(targetOffset);
-      }
-      return false;
-    }
-
-    void scheduleCenterAnchor({int maxRetries = 8}) {
-      final expectedAnchorAddress = browseState.anchorAddress;
-      if (expectedAnchorAddress == null) {
-        return;
-      }
-
-      void attempt(int remainingRetries) {
-        if (!context.mounted ||
-            browseState.anchorAddress != expectedAnchorAddress) {
-          return;
-        }
-        if (centerAnchorInViewport()) {
-          previousAnchorAddress.value = expectedAnchorAddress;
-          return;
-        }
-        if (remainingRetries <= 0) {
-          return;
-        }
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          attempt(remainingRetries - 1);
-        });
-      }
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        attempt(maxRetries);
-      });
-    }
+    useEffect(() {
+      return scrollController.dispose;
+    }, [scrollController]);
 
     useEffect(() {
       void handleScroll() {
@@ -128,10 +56,10 @@ class MemoryToolBrowseTab extends HookConsumerWidget {
           return;
         }
         final position = scrollController.position;
-        if (position.pixels <= 180.r) {
+        if (position.extentBefore <= 180.r) {
           browseNotifier.loadMoreAbove();
         }
-        if (position.maxScrollExtent - position.pixels <= 320.r) {
+        if (position.extentAfter <= 320.r) {
           browseNotifier.loadMoreBelow();
         }
       }
@@ -142,50 +70,34 @@ class MemoryToolBrowseTab extends HookConsumerWidget {
       };
     }, [scrollController, browseNotifier]);
 
-    useEffect(() {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!context.mounted || !scrollController.hasClients) {
-          return;
-        }
-        final position = scrollController.position;
-        if (position.pixels <= 180.r &&
-            !browseState.isLoadingAbove &&
-            !browseState.reachedTopBoundary) {
-          browseNotifier.loadMoreAbove();
-        }
-        if (position.maxScrollExtent - position.pixels <= 320.r &&
-            !browseState.isLoadingBelow &&
-            !browseState.reachedBottomBoundary) {
-          browseNotifier.loadMoreBelow();
-        }
-      });
-      return null;
-    }, [
-      visibleResults.length,
-      browseState.isLoadingAbove,
-      browseState.isLoadingBelow,
-      browseState.reachedTopBoundary,
-      browseState.reachedBottomBoundary,
-    ]);
-
-    useEffect(() {
-      if (browseState.isInitializing) {
-        previousAnchorAddress.value = null;
-      }
-      return null;
-    }, [browseState.isInitializing]);
-
-    useEffect(() {
-      final anchorAddress = browseState.anchorAddress;
-      if (anchorAddress == null ||
-          previousAnchorAddress.value == anchorAddress ||
-          visibleResults.isEmpty) {
+    useEffect(
+      () {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!context.mounted || !scrollController.hasClients) {
+            return;
+          }
+          final position = scrollController.position;
+          if (position.extentBefore <= 180.r &&
+              !browseState.isLoadingAbove &&
+              !browseState.reachedTopBoundary) {
+            browseNotifier.loadMoreAbove();
+          }
+          if (position.extentAfter <= 320.r &&
+              !browseState.isLoadingBelow &&
+              !browseState.reachedBottomBoundary) {
+            browseNotifier.loadMoreBelow();
+          }
+        });
         return null;
-      }
-
-      scheduleCenterAnchor();
-      return null;
-    }, [browseState.anchorAddress, visibleResults.length]);
+      },
+      [
+        visibleResults.length,
+        browseState.isLoadingAbove,
+        browseState.isLoadingBelow,
+        browseState.reachedTopBoundary,
+        browseState.reachedBottomBoundary,
+      ],
+    );
 
     if (selectedProcess == null) {
       return Center(
@@ -214,7 +126,8 @@ class MemoryToolBrowseTab extends HookConsumerWidget {
     };
     final resolvedLivePreviewsAsync =
         AsyncValue<Map<int, MemoryValuePreview>>.data(resolvedPreviewMap);
-    final currentFrozenAddresses = frozenValuesAsync.asData?.value
+    final currentFrozenAddresses =
+        frozenValuesAsync.asData?.value
             .where((value) => value.pid == selectedProcess.pid)
             .map((value) => value.address)
             .toSet() ??
@@ -230,11 +143,14 @@ class MemoryToolBrowseTab extends HookConsumerWidget {
       valueHistoryState.containsKey,
     );
     final visibleResultCount = browseState.results
-        .where((result) => !browseState.hiddenAddresses.contains(result.address))
+        .where(
+          (result) => !browseState.hiddenAddresses.contains(result.address),
+        )
         .length;
     final pageCount = browseState.selectionState.selectionLimit <= 0
         ? 0
-        : (visibleResultCount / browseState.selectionState.selectionLimit).ceil();
+        : (visibleResultCount / browseState.selectionState.selectionLimit)
+              .ceil();
 
     Future<void> showSavedToast(int count) async {
       await ToastOverlayMessage.show(
@@ -259,29 +175,21 @@ class MemoryToolBrowseTab extends HookConsumerWidget {
     }
 
     final resultList = browseState.hasAnchor
-        ? MemoryToolSearchResultList(
+        ? MemoryToolBrowseResultList(
             listStorageKey: PageStorageKey<String>(
-              'memory_tool_browse_results_${selectedProcess.pid}_${browseState.anchorAddress ?? 0}',
+              'memory_tool_browse_results_${selectedProcess.pid}_${browseState.anchorAddress ?? 0}_${browseState.focusRequestId}',
             ),
+            focusRequestId: browseState.focusRequestId,
             scrollController: scrollController,
             results: visibleResults,
+            anchorAddress: browseState.anchorAddress,
             isSelected: browseState.selectionState.contains,
             onToggleSelection: browseNotifier.toggle,
-            onDeleteResult: (result) {
-              browseNotifier.hideAddress(result.address);
-            },
             livePreviewsAsync: resolvedLivePreviewsAsync,
             previousValueByAddress: previousValueByAddress,
             processPid: selectedProcess.pid,
             initialFrozenStateByAddress: <int, bool>{
               for (final address in currentFrozenAddresses) address: true,
-            },
-            highlightedAddress: browseState.anchorAddress,
-            itemKeyBuilder: (result) {
-              if (result.address != browseState.anchorAddress) {
-                return null;
-              }
-              return anchorItemKey;
             },
           )
         : _MemoryToolBrowseEmptyState(
@@ -304,7 +212,6 @@ class MemoryToolBrowseTab extends HookConsumerWidget {
                             if (!context.mounted) {
                               return;
                             }
-                            scheduleCenterAnchor();
                           }
                         : null,
                   ),
@@ -313,7 +220,8 @@ class MemoryToolBrowseTab extends HookConsumerWidget {
                         ? Icons.play_arrow_rounded
                         : Icons.pause_rounded,
                     onTap:
-                        processControlState.isLoading || processPausedAsync.isLoading
+                        processControlState.isLoading ||
+                            processPausedAsync.isLoading
                         ? null
                         : () async {
                             try {
@@ -358,17 +266,6 @@ class MemoryToolBrowseTab extends HookConsumerWidget {
                     onTap: visibleResults.isEmpty
                         ? null
                         : browseNotifier.clearSelection,
-                  ),
-                  MemoryToolResultSelectionActionData(
-                    icon: Icons.delete_sweep_rounded,
-                    onTap: selectedResults.isEmpty
-                        ? null
-                        : () {
-                            browseNotifier.hideMany(
-                              browseState.selectionState.selectedAddresses,
-                            );
-                            browseNotifier.clearSelection();
-                          },
                   ),
                   MemoryToolResultSelectionActionData(
                     icon: Icons.save_alt_rounded,
@@ -431,13 +328,43 @@ class MemoryToolBrowseTab extends HookConsumerWidget {
               ),
               SizedBox(height: 8.r),
               Expanded(
-                child: browseState.isInitializing && !browseState.hasAnchor
-                    ? const Loading()
-                    : browseState.errorText != null && !browseState.hasAnchor
-                    ? _MemoryToolBrowseEmptyState(message: browseState.errorText!)
-                    : visibleResults.isEmpty && browseState.hasAnchor
-                    ? _MemoryToolBrowseEmptyState(message: context.l10n.noData)
-                    : resultList,
+                child: Stack(
+                  children: <Widget>[
+                    Positioned.fill(
+                      child:
+                          browseState.isInitializing && !browseState.hasAnchor
+                          ? const Loading()
+                          : browseState.errorText != null &&
+                                !browseState.hasAnchor
+                          ? _MemoryToolBrowseEmptyState(
+                              message: browseState.errorText!,
+                            )
+                          : visibleResults.isEmpty && browseState.hasAnchor
+                          ? _MemoryToolBrowseEmptyState(
+                              message: context.l10n.noData,
+                            )
+                          : resultList,
+                    ),
+                    if (browseState.isInitializing && browseState.hasAnchor)
+                      const Positioned.fill(
+                        child: _MemoryToolBrowseLoadingMask(),
+                      ),
+                    if (browseState.isLoadingAbove)
+                      const Positioned(
+                        top: 8,
+                        left: 0,
+                        right: 0,
+                        child: _MemoryToolBrowseEdgeLoader(isTop: true),
+                      ),
+                    if (browseState.isLoadingBelow)
+                      const Positioned(
+                        bottom: 8,
+                        left: 0,
+                        right: 0,
+                        child: _MemoryToolBrowseEdgeLoader(isTop: false),
+                      ),
+                  ],
+                ),
               ),
               SizedBox(height: 6.r),
               MemoryToolResultStatsBar(
@@ -504,6 +431,73 @@ class _MemoryToolBrowseEmptyState extends StatelessWidget {
           style: context.textTheme.bodyMedium?.copyWith(
             color: context.colorScheme.onSurface.withValues(alpha: 0.66),
             fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MemoryToolBrowseLoadingMask extends StatelessWidget {
+  const _MemoryToolBrowseLoadingMask();
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: ColoredBox(
+        color: Colors.black.withValues(alpha: 0.12),
+        child: Center(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: context.colorScheme.surface.withValues(alpha: 0.92),
+              borderRadius: BorderRadius.circular(18.r),
+              boxShadow: <BoxShadow>[
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20.r, vertical: 14.r),
+              child: SizedBox(
+                width: 28.r,
+                height: 28.r,
+                child: CircularProgressIndicator(strokeWidth: 2.4.r),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MemoryToolBrowseEdgeLoader extends StatelessWidget {
+  const _MemoryToolBrowseEdgeLoader({required this.isTop});
+
+  final bool isTop;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Center(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: context.colorScheme.surface.withValues(alpha: 0.92),
+            borderRadius: BorderRadius.circular(999.r),
+            border: Border.all(
+              color: context.colorScheme.outlineVariant.withValues(alpha: 0.42),
+            ),
+          ),
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 10.r),
+            child: SizedBox(
+              width: 14.r,
+              height: 14.r,
+              child: CircularProgressIndicator(strokeWidth: 2.r),
+            ),
           ),
         ),
       ),
