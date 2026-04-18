@@ -64,6 +64,7 @@ class MemoryToolSearchTab extends HookConsumerWidget {
         ref.invalidate(getSearchResultsProvider);
         ref.invalidate(hasMatchingSearchSessionProvider);
         ref.invalidate(currentSearchResultsProvider);
+        ref.invalidate(currentSearchResultLivePreviewsProvider);
       });
     }
 
@@ -82,8 +83,13 @@ class MemoryToolSearchTab extends HookConsumerWidget {
       taskStateAsync.whenData((state) {
         final previousStatus = previousTaskStatus.value;
         final currentStatus = state.status;
-        if (previousStatus == SearchTaskStatus.running &&
-            currentStatus != SearchTaskStatus.running) {
+        final isTerminalStatus =
+            currentStatus == SearchTaskStatus.completed ||
+            currentStatus == SearchTaskStatus.cancelled ||
+            currentStatus == SearchTaskStatus.failed;
+        final didEnterTerminalStatus =
+            isTerminalStatus && previousStatus != currentStatus;
+        if (didEnterTerminalStatus) {
           scheduleSearchRefresh();
           scheduleSelectionClear();
         }

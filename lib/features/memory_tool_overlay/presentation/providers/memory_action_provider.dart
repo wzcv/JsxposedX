@@ -119,6 +119,9 @@ class MemorySearchAction extends _$MemorySearchAction {
     ref.invalidate(getSearchSessionStateProvider);
     ref.invalidate(getSearchTaskStateProvider);
     ref.invalidate(getSearchResultsProvider);
+    ref.invalidate(hasMatchingSearchSessionProvider);
+    ref.invalidate(currentSearchResultsProvider);
+    ref.invalidate(currentSearchResultLivePreviewsProvider);
   }
 }
 

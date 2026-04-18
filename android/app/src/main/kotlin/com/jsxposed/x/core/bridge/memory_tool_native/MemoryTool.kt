@@ -174,18 +174,6 @@ class MemoryTool(private val context: Context) {
         return daemonClient.getPointerScanChaseHint()
     }
 
-    fun getPointerAutoChaseState(): PointerAutoChaseState {
-        return daemonClient.getPointerAutoChaseState()
-    }
-
-    fun getPointerAutoChaseLayerResults(
-        layerIndex: Int,
-        offset: Int,
-        limit: Int
-    ): List<PointerScanResult> {
-        return daemonClient.getPointerAutoChaseLayerResults(layerIndex, offset, limit)
-    }
-
     fun readMemoryValues(requests: List<MemoryReadRequest>): List<MemoryValuePreview> {
         return daemonClient.readMemoryValues(requests)
     }
@@ -252,24 +240,12 @@ class MemoryTool(private val context: Context) {
         daemonClient.startPointerScan(request)
     }
 
-    fun startPointerAutoChase(request: PointerAutoChaseRequest) {
-        daemonClient.startPointerAutoChase(request)
-    }
-
     fun cancelPointerScan() {
         daemonClient.cancelPointerScan()
     }
 
-    fun cancelPointerAutoChase() {
-        daemonClient.cancelPointerAutoChase()
-    }
-
     fun resetPointerScanSession() {
         daemonClient.resetPointerScanSession()
-    }
-
-    fun resetPointerAutoChase() {
-        daemonClient.resetPointerAutoChase()
     }
 
     private fun readProcessEntries(): List<RawProcessEntry> {

@@ -9,7 +9,6 @@ class MemoryToolDaemonClient(
     private val helperManager: MemoryToolHelperManager
 ) {
     companion object {
-        private const val REQUEST_TIMEOUT_MS = 4000
         private const val METHOD_PING = "ping"
         private const val METHOD_GET_MEMORY_REGIONS = "getMemoryRegions"
         private const val METHOD_GET_SEARCH_SESSION_STATE = "getSearchSessionState"
@@ -19,8 +18,6 @@ class MemoryToolDaemonClient(
         private const val METHOD_GET_POINTER_SCAN_TASK_STATE = "getPointerScanTaskState"
         private const val METHOD_GET_POINTER_SCAN_RESULTS = "getPointerScanResults"
         private const val METHOD_GET_POINTER_SCAN_CHASE_HINT = "getPointerScanChaseHint"
-        private const val METHOD_GET_POINTER_AUTO_CHASE_STATE = "getPointerAutoChaseState"
-        private const val METHOD_GET_POINTER_AUTO_CHASE_LAYER_RESULTS = "getPointerAutoChaseLayerResults"
         private const val METHOD_READ_MEMORY_VALUES = "readMemoryValues"
         private const val METHOD_WRITE_MEMORY_VALUE = "writeMemoryValue"
         private const val METHOD_SET_MEMORY_FREEZE = "setMemoryFreeze"
@@ -30,11 +27,8 @@ class MemoryToolDaemonClient(
         private const val METHOD_CANCEL_SEARCH = "cancelSearch"
         private const val METHOD_RESET_SEARCH_SESSION = "resetSearchSession"
         private const val METHOD_START_POINTER_SCAN = "startPointerScan"
-        private const val METHOD_START_POINTER_AUTO_CHASE = "startPointerAutoChase"
         private const val METHOD_CANCEL_POINTER_SCAN = "cancelPointerScan"
-        private const val METHOD_CANCEL_POINTER_AUTO_CHASE = "cancelPointerAutoChase"
         private const val METHOD_RESET_POINTER_SCAN_SESSION = "resetPointerScanSession"
-        private const val METHOD_RESET_POINTER_AUTO_CHASE = "resetPointerAutoChase"
 
         fun ping(socketName: String): Boolean {
             return try {
@@ -51,10 +45,8 @@ class MemoryToolDaemonClient(
             params: JSONObject?
         ): JSONObject {
             val socket = LocalSocket()
-            socket.soTimeout = REQUEST_TIMEOUT_MS
             socket.connect(LocalSocketAddress(socketName, LocalSocketAddress.Namespace.ABSTRACT))
             socket.use { localSocket ->
-                localSocket.soTimeout = REQUEST_TIMEOUT_MS
                 val writer = localSocket.outputStream.bufferedWriter()
                 val reader = localSocket.inputStream.bufferedReader()
                 val request = JSONObject().apply {
@@ -326,59 +318,6 @@ class MemoryToolDaemonClient(
         )
     }
 
-    fun getPointerAutoChaseState(): PointerAutoChaseState {
-        if (!helperManager.isDaemonAlive()) {
-            return PointerAutoChaseState(
-                isRunning = false,
-                pid = 0,
-                maxDepth = 0,
-                currentDepth = 0,
-                layers = emptyList(),
-                message = ""
-            )
-        }
-
-        val item = sendOrThrow(METHOD_GET_POINTER_AUTO_CHASE_STATE, null).getJSONObject("result")
-        return PointerAutoChaseState(
-            isRunning = item.optBoolean("isRunning", false),
-            pid = item.optLong("pid"),
-            maxDepth = item.optLong("maxDepth"),
-            currentDepth = item.optLong("currentDepth"),
-            layers = buildPointerAutoChaseLayers(item.optJSONArray("layers")),
-            message = item.optString("message")
-        )
-    }
-
-    fun getPointerAutoChaseLayerResults(
-        layerIndex: Int,
-        offset: Int,
-        limit: Int
-    ): List<PointerScanResult> {
-        if (!helperManager.isDaemonAlive()) {
-            return emptyList()
-        }
-
-        val result = sendOrThrow(
-            METHOD_GET_POINTER_AUTO_CHASE_LAYER_RESULTS,
-            JSONObject().apply {
-                put("layerIndex", layerIndex)
-                put("offset", offset)
-                put("limit", limit)
-            }
-        ).optJSONArray("result") ?: JSONArray()
-        return List(result.length()) { index ->
-            val item = result.getJSONObject(index)
-            PointerScanResult(
-                pointerAddress = item.getLong("pointerAddress"),
-                baseAddress = item.getLong("baseAddress"),
-                targetAddress = item.getLong("targetAddress"),
-                offset = item.getLong("offset"),
-                regionStart = item.getLong("regionStart"),
-                regionTypeKey = item.optString("regionTypeKey", "other")
-            )
-        }
-    }
-
     fun readMemoryValues(requests: List<MemoryReadRequest>): List<MemoryValuePreview> {
         if (requests.isEmpty()) {
             return emptyList()
@@ -526,42 +465,12 @@ class MemoryToolDaemonClient(
         )
     }
 
-    fun startPointerAutoChase(request: PointerAutoChaseRequest) {
-        helperManager.ensureDaemon()
-        sendOrThrow(
-            METHOD_START_POINTER_AUTO_CHASE,
-            JSONObject().apply {
-                put("pid", request.pid)
-                put("targetAddress", request.targetAddress)
-                put("pointerWidth", request.pointerWidth)
-                put("maxOffset", request.maxOffset)
-                put("alignment", request.alignment)
-                put("maxDepth", request.maxDepth)
-                put(
-                    "rangeSectionKeys",
-                    JSONArray().apply {
-                        request.rangeSectionKeys.forEach(::put)
-                    }
-                )
-                put("scanAllReadableRegions", request.scanAllReadableRegions)
-            }
-        )
-    }
-
     fun cancelPointerScan() {
         if (!helperManager.isDaemonAlive()) {
             return
         }
 
         sendOrThrow(METHOD_CANCEL_POINTER_SCAN, null)
-    }
-
-    fun cancelPointerAutoChase() {
-        if (!helperManager.isDaemonAlive()) {
-            return
-        }
-
-        sendOrThrow(METHOD_CANCEL_POINTER_AUTO_CHASE, null)
     }
 
     fun resetPointerScanSession() {
@@ -572,23 +481,8 @@ class MemoryToolDaemonClient(
         sendOrThrow(METHOD_RESET_POINTER_SCAN_SESSION, null)
     }
 
-    fun resetPointerAutoChase() {
-        if (!helperManager.isDaemonAlive()) {
-            return
-        }
-
-        sendOrThrow(METHOD_RESET_POINTER_AUTO_CHASE, null)
-    }
-
     private fun sendOrThrow(method: String, params: JSONObject?): JSONObject {
-        val response = try {
-            sendRequest(helperManager.socketName(), method, params)
-        } catch (error: Exception) {
-            throw IllegalStateException(
-                "Memory helper request timed out or failed: $method",
-                error
-            )
-        }
+        val response = sendRequest(helperManager.socketName(), method, params)
         if (!response.optBoolean("ok", false)) {
             throw IllegalStateException(response.optString("error", "Unknown memory helper error."))
         }
@@ -601,55 +495,6 @@ class MemoryToolDaemonClient(
             put("textValue", value.textValue)
             put("bytesHex", encodeHex(value.bytesValue))
             put("littleEndian", value.littleEndian)
-        }
-    }
-
-    private fun buildPointerAutoChaseLayers(items: JSONArray?): List<PointerAutoChaseLayerState> {
-        if (items == null) {
-            return emptyList()
-        }
-
-        return List(items.length()) { index ->
-            val item = items.getJSONObject(index)
-            PointerAutoChaseLayerState(
-                layerIndex = item.getLong("layerIndex"),
-                targetAddress = item.getLong("targetAddress"),
-                selectedPointerAddress = item.optLong("selectedPointerAddress")
-                    .takeIf { item.has("selectedPointerAddress") && !item.isNull("selectedPointerAddress") },
-                selectedResult = item.optJSONObject("selectedResult")?.let { result ->
-                    PointerScanResult(
-                        pointerAddress = result.getLong("pointerAddress"),
-                        baseAddress = result.getLong("baseAddress"),
-                        targetAddress = result.getLong("targetAddress"),
-                        offset = result.getLong("offset"),
-                        regionStart = result.getLong("regionStart"),
-                        regionTypeKey = result.optString("regionTypeKey", "other")
-                    )
-                },
-                resultCount = item.getLong("resultCount"),
-                hasMore = item.optBoolean("hasMore", false),
-                isTerminalLayer = item.optBoolean("isTerminalLayer", false),
-                stopReasonKey = item.optString("stopReasonKey"),
-                initialResults = buildPointerResults(item.optJSONArray("initialResults"))
-            )
-        }
-    }
-
-    private fun buildPointerResults(items: JSONArray?): List<PointerScanResult> {
-        if (items == null) {
-            return emptyList()
-        }
-
-        return List(items.length()) { index ->
-            val item = items.getJSONObject(index)
-            PointerScanResult(
-                pointerAddress = item.getLong("pointerAddress"),
-                baseAddress = item.getLong("baseAddress"),
-                targetAddress = item.getLong("targetAddress"),
-                offset = item.getLong("offset"),
-                regionStart = item.getLong("regionStart"),
-                regionTypeKey = item.optString("regionTypeKey", "other")
-            )
         }
     }
 }
