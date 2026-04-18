@@ -164,6 +164,45 @@ class MemoryToolNativeImpl(val context: Context) : MemoryToolNative {
         }
     }
 
+    override fun getPointerAutoChaseState(callback: (Result<PointerAutoChaseState>) -> Unit) {
+        scope.launch {
+            try {
+                val result = memoryTool.getPointerAutoChaseState()
+                withContext(Dispatchers.Main) {
+                    callback(Result.success(result))
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    callback(Result.failure(e))
+                }
+            }
+        }
+    }
+
+    override fun getPointerAutoChaseLayerResults(
+        layerIndex: Long,
+        offset: Long,
+        limit: Long,
+        callback: (Result<List<PointerScanResult>>) -> Unit
+    ) {
+        scope.launch {
+            try {
+                val result = memoryTool.getPointerAutoChaseLayerResults(
+                    layerIndex.toInt(),
+                    offset.toInt(),
+                    limit.toInt()
+                )
+                withContext(Dispatchers.Main) {
+                    callback(Result.success(result))
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    callback(Result.failure(e))
+                }
+            }
+        }
+    }
+
     override fun readMemoryValues(requests: List<MemoryReadRequest>, callback: (Result<List<MemoryValuePreview>>) -> Unit) {
         scope.launch {
             try {
@@ -329,6 +368,24 @@ class MemoryToolNativeImpl(val context: Context) : MemoryToolNative {
         }
     }
 
+    override fun startPointerAutoChase(
+        request: PointerAutoChaseRequest,
+        callback: (Result<Unit>) -> Unit
+    ) {
+        scope.launch {
+            try {
+                memoryTool.startPointerAutoChase(request)
+                withContext(Dispatchers.Main) {
+                    callback(Result.success(Unit))
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    callback(Result.failure(e))
+                }
+            }
+        }
+    }
+
     override fun cancelPointerScan(callback: (Result<Unit>) -> Unit) {
         scope.launch {
             try {
@@ -344,10 +401,40 @@ class MemoryToolNativeImpl(val context: Context) : MemoryToolNative {
         }
     }
 
+    override fun cancelPointerAutoChase(callback: (Result<Unit>) -> Unit) {
+        scope.launch {
+            try {
+                memoryTool.cancelPointerAutoChase()
+                withContext(Dispatchers.Main) {
+                    callback(Result.success(Unit))
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    callback(Result.failure(e))
+                }
+            }
+        }
+    }
+
     override fun resetPointerScanSession(callback: (Result<Unit>) -> Unit) {
         scope.launch {
             try {
                 memoryTool.resetPointerScanSession()
+                withContext(Dispatchers.Main) {
+                    callback(Result.success(Unit))
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    callback(Result.failure(e))
+                }
+            }
+        }
+    }
+
+    override fun resetPointerAutoChase(callback: (Result<Unit>) -> Unit) {
+        scope.launch {
+            try {
+                memoryTool.resetPointerAutoChase()
                 withContext(Dispatchers.Main) {
                     callback(Result.success(Unit))
                 }

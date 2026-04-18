@@ -161,6 +161,70 @@ class PointerScanChaseHint {
   });
 }
 
+class PointerAutoChaseRequest {
+  final int pid;
+  final int targetAddress;
+  final int pointerWidth;
+  final int maxOffset;
+  final int alignment;
+  final int maxDepth;
+  final List<String> rangeSectionKeys;
+  final bool scanAllReadableRegions;
+
+  const PointerAutoChaseRequest({
+    required this.pid,
+    required this.targetAddress,
+    required this.pointerWidth,
+    required this.maxOffset,
+    required this.alignment,
+    required this.maxDepth,
+    required this.rangeSectionKeys,
+    required this.scanAllReadableRegions,
+  });
+}
+
+class PointerAutoChaseLayerState {
+  final int layerIndex;
+  final int targetAddress;
+  final int? selectedPointerAddress;
+  final PointerScanResult? selectedResult;
+  final int resultCount;
+  final bool hasMore;
+  final bool isTerminalLayer;
+  final String stopReasonKey;
+  final List<PointerScanResult> initialResults;
+
+  const PointerAutoChaseLayerState({
+    required this.layerIndex,
+    required this.targetAddress,
+    this.selectedPointerAddress,
+    this.selectedResult,
+    required this.resultCount,
+    required this.hasMore,
+    required this.isTerminalLayer,
+    required this.stopReasonKey,
+    required this.initialResults,
+  });
+}
+
+class PointerAutoChaseState {
+  final bool isRunning;
+  final int pid;
+  final int maxDepth;
+  final int currentDepth;
+  final List<PointerAutoChaseLayerState> layers;
+  final String message;
+
+  const PointerAutoChaseState({
+    required this.isRunning,
+    required this.pid,
+    required this.maxDepth,
+    required this.currentDepth,
+    required this.layers,
+    required this.message,
+  });
+}
+
 class MemoryReadRequest {
   final int pid;
   final int address;
@@ -361,6 +425,16 @@ abstract class MemoryToolNative {
   PointerScanChaseHint getPointerScanChaseHint();
 
   @async
+  PointerAutoChaseState getPointerAutoChaseState();
+
+  @async
+  List<PointerScanResult> getPointerAutoChaseLayerResults(
+    int layerIndex,
+    int offset,
+    int limit,
+  );
+
+  @async
   List<MemoryValuePreview> readMemoryValues(List<MemoryReadRequest> requests);
 
   @async
@@ -394,8 +468,17 @@ abstract class MemoryToolNative {
   void startPointerScan(PointerScanRequest request);
 
   @async
+  void startPointerAutoChase(PointerAutoChaseRequest request);
+
+  @async
   void cancelPointerScan();
 
   @async
+  void cancelPointerAutoChase();
+
+  @async
   void resetPointerScanSession();
+
+  @async
+  void resetPointerAutoChase();
 }

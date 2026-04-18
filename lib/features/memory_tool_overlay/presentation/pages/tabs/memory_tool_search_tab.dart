@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
-
 import 'package:JsxposedX/common/pages/toast.dart';
 import 'package:JsxposedX/common/widgets/loading.dart';
 import 'package:JsxposedX/core/extensions/context_extensions.dart';
@@ -14,7 +12,6 @@ import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memo
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_action_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_query_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_search_provider.dart';
-import 'package:JsxposedX/features/memory_tool_overlay/presentation/utils/memory_tool_search_result_presenter.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_search_task_panel.dart';
 import 'package:JsxposedX/generated/memory_tool.g.dart';
 import 'package:flutter/material.dart';
@@ -40,7 +37,6 @@ class MemoryToolSearchTab extends HookConsumerWidget {
     final isLocateExpressionDialogVisible = useState(false);
     final isLocateExpressionLoading = useState(false);
     final selectedPid = ref.watch(memoryToolSelectedProcessProvider)?.pid;
-    final searchFormState = ref.watch(memoryToolSearchFormProvider);
     final sessionStateAsync = ref.watch(getSearchSessionStateProvider);
     final taskStateAsync = ref.watch(getSearchTaskStateProvider);
     final hasMatchingSession = ref.watch(hasMatchingSearchSessionProvider);
@@ -123,6 +119,13 @@ class MemoryToolSearchTab extends HookConsumerWidget {
       return null;
     }, [sessionStateAsync, selectedPid]);
 
+    void stopLocateExpressionLoading() {
+      if (!context.mounted || !isLocateExpressionLoading.value) {
+        return;
+      }
+      isLocateExpressionLoading.value = false;
+    }
+
     Future<void> jumpToAddress(int targetAddress) async {
       if (selectedPid == null) {
         return;
@@ -131,22 +134,7 @@ class MemoryToolSearchTab extends HookConsumerWidget {
       try {
         await ref
             .read(memoryToolBrowseControllerProvider.notifier)
-            .previewFromAddress(
-              sourceResult: SearchResult(
-                address: targetAddress,
-                regionStart: 0,
-                regionTypeKey: 'other',
-                type: searchFormState.requestSearchValueType,
-                rawBytes: Uint8List(
-                  _resolveJumpBytesLength(
-                    type: searchFormState.requestSearchValueType,
-                    rawSearchInput: searchFormState.value,
-                  ),
-                ),
-                displayValue: '',
-              ),
-              targetAddress: targetAddress,
-            );
+            .previewRawAddress(targetAddress: targetAddress);
         if (!context.mounted) {
           return;
         }
@@ -243,25 +231,33 @@ class MemoryToolSearchTab extends HookConsumerWidget {
                     }
                     isLocateExpressionLoading.value = true;
                     try {
+                      final browseNotifier = ref.read(
+                        memoryToolBrowseControllerProvider.notifier,
+                      );
+                      final readableRegions = await browseNotifier.ensureReadableRegions(
+                        pid: selectedPid,
+                      );
                       final targetAddress =
                           await resolveMemoryToolPointerExpressionTargetAddress(
                             repository: ref.read(memoryQueryRepositoryProvider),
                             pid: selectedPid,
                             expression: expression,
+                            readableRegions: readableRegions,
                           );
+                      stopLocateExpressionLoading();
                       await jumpToAddress(targetAddress);
                     } catch (_) {
-                      if (!context.mounted) {
-                        return;
-                      }
-                      await ToastOverlayMessage.show(
-                        context.l10n.memoryToolOffsetPreviewUnreadable,
-                        duration: const Duration(milliseconds: 1200),
-                      );
-                    } finally {
+                      stopLocateExpressionLoading();
                       if (context.mounted) {
-                        isLocateExpressionLoading.value = false;
+                        unawaited(
+                          ToastOverlayMessage.show(
+                            context.l10n.memoryToolOffsetPreviewUnreadable,
+                            duration: const Duration(milliseconds: 1200),
+                          ),
+                        );
                       }
+                    } finally {
+                      stopLocateExpressionLoading();
                     }
                   },
                   onClose: () {
@@ -340,24 +336,6 @@ class MemoryToolSearchTab extends HookConsumerWidget {
       },
     );
   }
-}
-
-int _resolveJumpBytesLength({
-  required SearchValueType type,
-  required String rawSearchInput,
-}) {
-  if (type != SearchValueType.bytes) {
-    return resolveMemoryToolReadLengthForType(type: type, bytesLength: 0);
-  }
-
-  final sanitized = rawSearchInput
-      .replaceAll(RegExp(r'0x', caseSensitive: false), '')
-      .replaceAll(RegExp(r'[^0-9a-fA-F]'), '');
-  final inferredBytesLength = sanitized.isEmpty ? 1 : sanitized.length ~/ 2;
-  return resolveMemoryToolReadLengthForType(
-    type: type,
-    bytesLength: inferredBytesLength < 1 ? 1 : inferredBytesLength,
-  );
 }
 
 String _resolveExpressionLoadingText(BuildContext context) {

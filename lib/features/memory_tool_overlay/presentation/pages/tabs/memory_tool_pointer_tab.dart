@@ -300,6 +300,7 @@ class MemoryToolPointerTab extends HookConsumerWidget {
               taskState: currentTaskState,
               currentDepth: pointerState.autoChaseCurrentDepth,
               maxDepth: pointerState.autoChaseMaxDepth,
+              message: pointerState.autoChaseMessage,
               onCancel: pointerController.cancelAutoChase,
             ),
           ),
@@ -397,12 +398,14 @@ class _MemoryToolPointerAutoChaseMask extends StatelessWidget {
     required this.taskState,
     required this.currentDepth,
     required this.maxDepth,
+    required this.message,
     required this.onCancel,
   });
 
   final PointerScanTaskState? taskState;
   final int currentDepth;
   final int maxDepth;
+  final String? message;
   final VoidCallback onCancel;
 
   @override
@@ -445,6 +448,16 @@ class _MemoryToolPointerAutoChaseMask extends StatelessWidget {
                     color: context.colorScheme.primary,
                   ),
                 ),
+                if (message != null && message!.isNotEmpty) ...<Widget>[
+                  SizedBox(height: 4.r),
+                  Text(
+                    message!,
+                    style: context.textTheme.bodySmall?.copyWith(
+                      color: context.colorScheme.onSurface.withValues(alpha: 0.72),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
                 SizedBox(height: 4.r),
                 Text(
                   '${context.l10n.memoryToolTaskRegionsLabel}: $processedRegions/$totalRegions',

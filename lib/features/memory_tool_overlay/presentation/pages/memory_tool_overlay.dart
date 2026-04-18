@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:JsxposedX/common/widgets/overlay_window/overlay_window.dart';
 import 'package:JsxposedX/core/extensions/context_extensions.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_action_provider.dart';
@@ -6,6 +8,8 @@ import 'package:JsxposedX/features/memory_tool_overlay/presentation/pages/tabs/m
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_browse_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_pointer_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_pointer_action_provider.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_pointer_auto_chase_action_provider.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_pointer_auto_chase_query_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_pointer_query_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_query_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_search_provider.dart';
@@ -86,6 +90,12 @@ class MemoryToolOverlay extends HookConsumerWidget {
               .resetPointerScanSession();
         } catch (_) {}
 
+        try {
+          await ref
+              .read(memoryPointerAutoChaseActionProvider.notifier)
+              .resetPointerAutoChase();
+        } catch (_) {}
+
         ref.read(memoryToolSelectedProcessProvider.notifier).clear();
         ref.read(memoryToolResultSelectionProvider.notifier).clear();
         ref.invalidate(memorySearchActionProvider);
@@ -101,6 +111,8 @@ class MemoryToolOverlay extends HookConsumerWidget {
         ref.invalidate(getPointerScanSessionStateProvider);
         ref.invalidate(getPointerScanTaskStateProvider);
         ref.invalidate(getPointerScanResultsProvider);
+        ref.invalidate(getPointerAutoChaseStateProvider);
+        ref.invalidate(getPointerAutoChaseLayerResultsProvider);
         ref.invalidate(hasMatchingSearchSessionProvider);
         ref.invalidate(hasRunningSearchTaskProvider);
         ref.invalidate(hasRunningPointerTaskProvider);
@@ -314,14 +326,24 @@ class MemoryToolOverlay extends HookConsumerWidget {
                   isPickerVisible.value = false;
                 },
                 onSelected: (process) {
-                  ref.read(memoryToolBrowseControllerProvider.notifier).clear();
+                  final browseNotifier =
+                      ref.read(memoryToolBrowseControllerProvider.notifier);
+                  browseNotifier.clear();
                   ref.read(memoryToolPointerControllerProvider.notifier).clear();
                   ref
                       .read(memoryPointerActionProvider.notifier)
                       .resetPointerScanSession();
                   ref
+                      .read(memoryPointerAutoChaseActionProvider.notifier)
+                      .resetPointerAutoChase();
+                  ref
                       .read(memoryToolSelectedProcessProvider.notifier)
                       .select(process);
+                  Future<void>.microtask(() async {
+                    try {
+                      await browseNotifier.ensureReadableRegions(pid: process.pid.toInt());
+                    } catch (_) {}
+                  });
                   isPickerVisible.value = false;
                 },
                 onRetry: () {

@@ -76,11 +76,16 @@ Future<int> resolveMemoryToolPointerExpressionTargetAddress({
   required MemoryQueryRepository repository,
   required int pid,
   required MemoryToolPointerExpression expression,
+  List<MemoryRegion>? readableRegions,
 }) async {
-  final regions = await _loadAllMemoryRegions(repository: repository, pid: pid);
+  var regions = readableRegions;
+  if ((expression.soName?.isNotEmpty ?? false) &&
+      (regions == null || regions.isEmpty)) {
+    regions = await _loadReadableMemoryRegions(repository: repository, pid: pid);
+  }
   final initialAddress = _resolveExpressionStartAddress(
     expression: expression,
-    regions: regions,
+    regions: regions ?? const <MemoryRegion>[],
   );
   if (initialAddress < 0) {
     throw FormatException('Invalid address');
@@ -89,9 +94,13 @@ Future<int> resolveMemoryToolPointerExpressionTargetAddress({
     return initialAddress;
   }
 
+  regions ??= await _loadReadableMemoryRegions(repository: repository, pid: pid);
   int? preferredPointerWidth;
   var currentAddress = initialAddress;
   for (final offset in expression.offsets) {
+    if (!_isReadablePointerAddress(regions: regions, address: currentAddress)) {
+      throw StateError('Unreadable pointer');
+    }
     final pointerRead = await _readPointerWithBestWidth(
       repository: repository,
       pid: pid,
@@ -111,7 +120,7 @@ Future<int> resolveMemoryToolPointerExpressionTargetAddress({
   return currentAddress;
 }
 
-Future<List<MemoryRegion>> _loadAllMemoryRegions({
+Future<List<MemoryRegion>> _loadReadableMemoryRegions({
   required MemoryQueryRepository repository,
   required int pid,
 }) async {
@@ -123,7 +132,7 @@ Future<List<MemoryRegion>> _loadAllMemoryRegions({
       pid: pid,
       offset: offset,
       limit: _memoryToolExpressionRegionPageSize,
-      readableOnly: false,
+      readableOnly: true,
       includeAnonymous: true,
       includeFileBacked: true,
     );
@@ -245,6 +254,28 @@ int _scoreDecodedPointerAddress({
     return 1;
   }
   return 0;
+}
+
+bool _isReadablePointerAddress({
+  required List<MemoryRegion> regions,
+  required int address,
+}) {
+  if (address < 0) {
+    return false;
+  }
+
+  for (final region in regions) {
+    if (address < region.startAddress) {
+      return false;
+    }
+    if (address >= region.startAddress && address + 4 <= region.endAddress) {
+      return true;
+    }
+    if (address < region.endAddress) {
+      return false;
+    }
+  }
+  return false;
 }
 
 MemoryRegion? _findRegionContainingAddress(

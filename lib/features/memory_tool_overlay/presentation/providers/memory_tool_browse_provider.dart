@@ -65,9 +65,104 @@ Future<Map<int, MemoryValuePreview>> currentBrowseResultLivePreviews(
 
 @Riverpod(keepAlive: true)
 class MemoryToolBrowseController extends _$MemoryToolBrowseController {
+  int? _cachedReadableRegionsPid;
+  List<MemoryRegion>? _cachedReadableRegions;
+  Future<List<MemoryRegion>>? _readableRegionsLoadFuture;
+
   @override
   MemoryToolBrowseState build() {
     return const MemoryToolBrowseState();
+  }
+
+  Future<List<MemoryRegion>> ensureReadableRegions({
+    required int pid,
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh &&
+        _cachedReadableRegionsPid == pid &&
+        _cachedReadableRegions != null) {
+      return _cachedReadableRegions!;
+    }
+
+    if (!forceRefresh &&
+        _cachedReadableRegionsPid == pid &&
+        _readableRegionsLoadFuture != null) {
+      return _readableRegionsLoadFuture!;
+    }
+
+    final future = _loadReadableRegions(pid: pid);
+    _cachedReadableRegionsPid = pid;
+    _readableRegionsLoadFuture = future;
+    try {
+      final regions = await future;
+      if (_cachedReadableRegionsPid == pid) {
+        _cachedReadableRegions = regions;
+      }
+      return regions;
+    } finally {
+      if (_cachedReadableRegionsPid == pid) {
+        _readableRegionsLoadFuture = null;
+      }
+    }
+  }
+
+  Future<void> previewRawAddress({
+    required int targetAddress,
+    SearchValueType? type,
+    int? bytesLength,
+  }) async {
+    final selectedProcess = ref.read(memoryToolSelectedProcessProvider);
+    if (selectedProcess == null) {
+      return;
+    }
+
+    final hasCompatibleAnchor =
+        state.hasAnchor &&
+        _cachedReadableRegionsPid == selectedProcess.pid &&
+        state.strideBytes > 0;
+    final resolvedType = type ?? (hasCompatibleAnchor ? state.browseType : SearchValueType.i32);
+    final resolvedBytesLength =
+        bytesLength ??
+        (hasCompatibleAnchor
+            ? state.strideBytes
+            : resolveMemoryToolReadLengthForType(type: resolvedType, bytesLength: 0));
+    final readableRegions = await ensureReadableRegions(pid: selectedProcess.pid);
+    final targetRegion = _resolveRegionForAddress(
+      regions: readableRegions,
+      address: targetAddress,
+      strideBytes: resolvedBytesLength,
+    );
+    if (targetRegion == null) {
+      throw Exception('Target address is unreadable.');
+    }
+
+    final targetPreview = await _readTargetPreviewOrNull(
+      selectedPid: selectedProcess.pid,
+      address: targetAddress,
+      bytesLength: resolvedBytesLength,
+    );
+    if (targetPreview == null) {
+      throw Exception('Target address is unreadable.');
+    }
+
+    final anchorResult = SearchResult(
+      address: targetAddress,
+      regionStart: targetRegion.startAddress,
+      regionTypeKey: _mapBrowseRegionTypeKey(targetRegion),
+      type: resolvedType,
+      rawBytes: targetPreview.rawBytes,
+      displayValue: resolveMemoryToolSearchResultValueByType(
+        type: resolvedType,
+        rawBytes: targetPreview.rawBytes,
+        fallbackDisplayValue: targetPreview.displayValue,
+      ),
+    );
+
+    await _previewAnchorResult(
+      selectedPid: selectedProcess.pid,
+      anchorResult: anchorResult,
+      knownReadableRegions: readableRegions,
+    );
   }
 
   Future<void> previewFromSearchResult({
@@ -97,14 +192,14 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
       result: sourceResult,
     );
     final strideBytes = sourceRawBytes.isEmpty ? 1 : sourceRawBytes.length;
-    var readableRegions = state.regions;
+    var readableRegions = _resolveCachedReadableRegions(pid: selectedProcess.pid);
     var targetRegion = _resolveRegionForAddress(
       regions: readableRegions,
       address: targetAddress,
       strideBytes: strideBytes,
     );
     if (targetRegion == null) {
-      readableRegions = await _loadReadableRegions(pid: selectedProcess.pid);
+      readableRegions = await ensureReadableRegions(pid: selectedProcess.pid);
       targetRegion = _resolveRegionForAddress(
         regions: readableRegions,
         address: targetAddress,
@@ -389,8 +484,10 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
         state.results.isEmpty &&
         state.hiddenAddresses.isEmpty &&
         state.selectionState.selectedAddresses.isEmpty) {
+      _clearReadableRegionCache();
       return;
     }
+    _clearReadableRegionCache();
     state = const MemoryToolBrowseState();
   }
 
@@ -700,6 +797,10 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
           readableRegions: state.regions,
           preservedHiddenAddresses: nextHiddenAddresses,
         );
+        _updateReadableRegionCache(
+          pid: selectedPid,
+          regions: nextState.regions,
+        );
         state = nextState.copyWith(
           isInitializing: false,
           clearErrorText: true,
@@ -723,8 +824,9 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
 
     try {
       final readableRegions =
-          knownReadableRegions ?? await _loadReadableRegions(pid: selectedPid);
+          knownReadableRegions ?? await ensureReadableRegions(pid: selectedPid);
       if (readableRegions.isEmpty) {
+        _updateReadableRegionCache(pid: selectedPid, regions: readableRegions);
         state = state.copyWith(
           results: const <SearchResult>[],
           regions: const <MemoryRegion>[],
@@ -756,6 +858,10 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
         anchorResult: finalAnchorResult,
         readableRegions: readableRegions,
         preservedHiddenAddresses: const <int>{},
+      );
+      _updateReadableRegionCache(
+        pid: selectedPid,
+        regions: nextState.regions,
       );
       state = nextState.copyWith(
         isInitializing: false,
@@ -795,6 +901,27 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
     } catch (_) {
       return null;
     }
+  }
+
+  List<MemoryRegion> _resolveCachedReadableRegions({required int pid}) {
+    if (_cachedReadableRegionsPid == pid && _cachedReadableRegions != null) {
+      return _cachedReadableRegions!;
+    }
+    return const <MemoryRegion>[];
+  }
+
+  void _updateReadableRegionCache({
+    required int pid,
+    required List<MemoryRegion> regions,
+  }) {
+    _cachedReadableRegionsPid = pid;
+    _cachedReadableRegions = regions;
+  }
+
+  void _clearReadableRegionCache() {
+    _cachedReadableRegionsPid = null;
+    _cachedReadableRegions = null;
+    _readableRegionsLoadFuture = null;
   }
 }
 

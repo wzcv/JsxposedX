@@ -6,6 +6,7 @@ class PointerChainLayerState {
     required this.request,
     this.results = const <PointerScanResult>[],
     this.totalResultCount = 0,
+    this.autoChaseLayerIndex,
     this.sourceResult,
     this.isLoadingInitial = false,
     this.isLoadingMore = false,
@@ -21,6 +22,7 @@ class PointerChainLayerState {
   final PointerScanRequest request;
   final List<PointerScanResult> results;
   final int totalResultCount;
+  final int? autoChaseLayerIndex;
   final PointerScanResult? sourceResult;
   final bool isLoadingInitial;
   final bool isLoadingMore;
@@ -36,6 +38,7 @@ class PointerChainLayerState {
     PointerScanRequest? request,
     List<PointerScanResult>? results,
     int? totalResultCount,
+    int? autoChaseLayerIndex,
     PointerScanResult? sourceResult,
     bool? isLoadingInitial,
     bool? isLoadingMore,
@@ -49,11 +52,15 @@ class PointerChainLayerState {
     bool clearErrorText = false,
     bool clearSelectedPointerAddress = false,
     bool clearAutoStopReasonKey = false,
+    bool clearAutoChaseLayerIndex = false,
   }) {
     return PointerChainLayerState(
       request: request ?? this.request,
       results: results ?? this.results,
       totalResultCount: totalResultCount ?? this.totalResultCount,
+      autoChaseLayerIndex: clearAutoChaseLayerIndex
+          ? null
+          : autoChaseLayerIndex ?? this.autoChaseLayerIndex,
       sourceResult: sourceResult ?? this.sourceResult,
       isLoadingInitial: isLoadingInitial ?? this.isLoadingInitial,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
@@ -79,6 +86,7 @@ class MemoryToolPointerState {
     this.isAutoChasing = false,
     this.autoChaseMaxDepth = 0,
     this.autoChaseCurrentDepth = 0,
+    this.autoChaseMessage,
   });
 
   final List<PointerChainLayerState> layers;
@@ -86,6 +94,7 @@ class MemoryToolPointerState {
   final bool isAutoChasing;
   final int autoChaseMaxDepth;
   final int autoChaseCurrentDepth;
+  final String? autoChaseMessage;
 
   PointerChainLayerState? get currentLayer {
     if (currentLayerIndex < 0 || currentLayerIndex >= layers.length) {
@@ -102,6 +111,8 @@ class MemoryToolPointerState {
     bool? isAutoChasing,
     int? autoChaseMaxDepth,
     int? autoChaseCurrentDepth,
+    String? autoChaseMessage,
+    bool clearAutoChaseMessage = false,
   }) {
     return MemoryToolPointerState(
       layers: layers ?? this.layers,
@@ -110,6 +121,9 @@ class MemoryToolPointerState {
       autoChaseMaxDepth: autoChaseMaxDepth ?? this.autoChaseMaxDepth,
       autoChaseCurrentDepth:
           autoChaseCurrentDepth ?? this.autoChaseCurrentDepth,
+      autoChaseMessage: clearAutoChaseMessage
+          ? null
+          : autoChaseMessage ?? this.autoChaseMessage,
     );
   }
 }
