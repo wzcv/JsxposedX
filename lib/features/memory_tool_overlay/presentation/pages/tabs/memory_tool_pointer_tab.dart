@@ -38,6 +38,7 @@ class MemoryToolPointerTab extends HookConsumerWidget {
     final scrollController = useScrollController();
     final previousTaskStatus = useRef<SearchTaskStatus?>(null);
     final selectedRegionTypeKeys = useState<Set<String>>(<String>{});
+    final isJumpingToTarget = useState(false);
 
     useEffect(() {
       void handleScroll() {
@@ -136,17 +137,24 @@ class MemoryToolPointerTab extends HookConsumerWidget {
         return;
       }
 
-      await previewAndOpenBrowse(
-        () => ref
-            .read(memoryToolBrowseControllerProvider.notifier)
-            .previewFromAddress(
-              sourceResult: buildSearchResultFromPointerResult(
-                result: result,
-                pointerWidth: layer.request.pointerWidth,
+      isJumpingToTarget.value = true;
+      try {
+        await previewAndOpenBrowse(
+          () => ref
+              .read(memoryToolBrowseControllerProvider.notifier)
+              .previewFromAddress(
+                sourceResult: buildSearchResultFromPointerResult(
+                  result: result,
+                  pointerWidth: layer.request.pointerWidth,
+                ),
+                targetAddress: result.targetAddress,
               ),
-              targetAddress: result.targetAddress,
-            ),
-      );
+        );
+      } finally {
+        if (context.mounted) {
+          isJumpingToTarget.value = false;
+        }
+      }
     }
 
     bool matchesPointerResult(PointerScanResult result) {
@@ -345,7 +353,59 @@ class MemoryToolPointerTab extends HookConsumerWidget {
               ),
             ),
           ),
+        if (isJumpingToTarget.value)
+          const Positioned.fill(
+            child: _MemoryToolPointerJumpLoadingMask(),
+          ),
       ],
+    );
+  }
+}
+
+class _MemoryToolPointerJumpLoadingMask extends StatelessWidget {
+  const _MemoryToolPointerJumpLoadingMask();
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: ColoredBox(
+        color: Colors.black.withValues(alpha: 0.12),
+        child: Center(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: context.colorScheme.surface.withValues(alpha: 0.92),
+              borderRadius: BorderRadius.circular(18.r),
+              boxShadow: <BoxShadow>[
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20.r, vertical: 14.r),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  SizedBox(
+                    width: 28.r,
+                    height: 28.r,
+                    child: CircularProgressIndicator(strokeWidth: 2.4.r),
+                  ),
+                  SizedBox(height: 10.r),
+                  Text(
+                    context.l10n.loading,
+                    style: context.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
