@@ -1,5 +1,6 @@
 import 'package:JsxposedX/core/extensions/context_extensions.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_query_provider.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/states/memory_tool_pointer_state.dart';
 import 'package:JsxposedX/features/overlay_window/presentation/providers/overlay_window_host_runtime_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/utils/memory_tool_region_owner_resolver.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/utils/memory_tool_search_result_presenter.dart';
@@ -19,6 +20,8 @@ class MemoryToolPointerResultList extends HookConsumerWidget {
     required this.results,
     required this.request,
     required this.scrollController,
+    required this.chainLayers,
+    required this.currentLayerIndex,
     this.selectedPointerAddress,
     this.isTerminalLayer = false,
     required this.onContinueSearch,
@@ -28,6 +31,8 @@ class MemoryToolPointerResultList extends HookConsumerWidget {
   final List<PointerScanResult> results;
   final PointerScanRequest request;
   final ScrollController scrollController;
+  final List<PointerChainLayerState> chainLayers;
+  final int currentLayerIndex;
   final int? selectedPointerAddress;
   final bool isTerminalLayer;
   final Future<void> Function(PointerScanResult result) onContinueSearch;
@@ -86,6 +91,26 @@ class MemoryToolPointerResultList extends HookConsumerWidget {
                   },
                 ),
                 MemoryToolSearchResultActionItemData(
+                  icon: Icons.data_object_rounded,
+                  title: context.l10n.memoryToolPointerActionCopyExpression,
+                  onTap: () async {
+                    final soName = await resolveMemoryToolRegionOwnerSoName(
+                      repository: ref.read(memoryQueryRepositoryProvider),
+                      pid: request.pid,
+                      regionStart: result.regionStart,
+                    );
+                    await copyText(
+                      _buildPointerExpression(
+                        result,
+                        soName: soName,
+                        chainLayers: chainLayers,
+                        currentLayerIndex: currentLayerIndex,
+                      ),
+                    );
+                    activeActionDialog.value = null;
+                  },
+                ),
+                MemoryToolSearchResultActionItemData(
                   icon: Icons.copy_all_rounded,
                   title:
                       '${context.l10n.memoryToolPointerActionCopyPointerAddress}: ${formatMemoryToolSearchResultAddress(result.pointerAddress)}',
@@ -115,19 +140,6 @@ class MemoryToolPointerResultList extends HookConsumerWidget {
                     await copyText(
                       formatMemoryToolSearchResultAddress(result.targetAddress),
                     );
-                    activeActionDialog.value = null;
-                  },
-                ),
-                MemoryToolSearchResultActionItemData(
-                  icon: Icons.data_object_rounded,
-                  title: context.l10n.memoryToolPointerActionCopyExpression,
-                  onTap: () async {
-                    final soName = await resolveMemoryToolRegionOwnerSoName(
-                      repository: ref.read(memoryQueryRepositoryProvider),
-                      pid: request.pid,
-                      regionStart: result.regionStart,
-                    );
-                    await copyText(_buildPointerExpression(result, soName: soName));
                     activeActionDialog.value = null;
                   },
                 ),
@@ -291,10 +303,39 @@ class _MemoryToolPointerResultTile extends StatelessWidget {
 String _buildPointerExpression(
   PointerScanResult result, {
   required String soName,
+  required List<PointerChainLayerState> chainLayers,
+  required int currentLayerIndex,
 }) {
   final addr = '0x${formatMemoryToolSearchResultAddress(result.pointerAddress)}';
-  final offset = '0x${result.offset.toRadixString(16).toUpperCase()}';
-  return '{so:"$soName",memory:"${_resolvePointerExpressionMemory(result.regionTypeKey)}",addr:$addr,offsets:[$offset]}';
+  final offsets = _resolvePointerExpressionOffsets(
+    result: result,
+    chainLayers: chainLayers,
+    currentLayerIndex: currentLayerIndex,
+  );
+  final offsetsLiteral = offsets
+      .map((offset) => '0x${offset.toRadixString(16).toUpperCase()}')
+      .join(',');
+  return '{so:"$soName",memory:"${_resolvePointerExpressionMemory(result.regionTypeKey)}",addr:$addr,offsets:[$offsetsLiteral]}';
+}
+
+List<int> _resolvePointerExpressionOffsets({
+  required PointerScanResult result,
+  required List<PointerChainLayerState> chainLayers,
+  required int currentLayerIndex,
+}) {
+  final offsets = <int>[result.offset];
+  if (currentLayerIndex <= 0 || currentLayerIndex >= chainLayers.length) {
+    return offsets;
+  }
+
+  for (var layerIndex = currentLayerIndex - 1; layerIndex >= 0; layerIndex -= 1) {
+    final sourceResult = chainLayers[layerIndex + 1].sourceResult;
+    if (sourceResult == null) {
+      break;
+    }
+    offsets.add(sourceResult.offset);
+  }
+  return offsets;
 }
 
 String _resolvePointerExpressionMemory(String regionTypeKey) {

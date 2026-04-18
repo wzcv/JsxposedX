@@ -6,6 +6,7 @@ class PointerChainLayerState {
     required this.request,
     this.results = const <PointerScanResult>[],
     this.totalResultCount = 0,
+    this.sourceResult,
     this.isLoadingInitial = false,
     this.isLoadingMore = false,
     this.hasMore = false,
@@ -20,6 +21,7 @@ class PointerChainLayerState {
   final PointerScanRequest request;
   final List<PointerScanResult> results;
   final int totalResultCount;
+  final PointerScanResult? sourceResult;
   final bool isLoadingInitial;
   final bool isLoadingMore;
   final bool hasMore;
@@ -34,6 +36,7 @@ class PointerChainLayerState {
     PointerScanRequest? request,
     List<PointerScanResult>? results,
     int? totalResultCount,
+    PointerScanResult? sourceResult,
     bool? isLoadingInitial,
     bool? isLoadingMore,
     bool? hasMore,
@@ -51,6 +54,7 @@ class PointerChainLayerState {
       request: request ?? this.request,
       results: results ?? this.results,
       totalResultCount: totalResultCount ?? this.totalResultCount,
+      sourceResult: sourceResult ?? this.sourceResult,
       isLoadingInitial: isLoadingInitial ?? this.isLoadingInitial,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       hasMore: hasMore ?? this.hasMore,
@@ -74,12 +78,14 @@ class MemoryToolPointerState {
     this.currentLayerIndex = -1,
     this.isAutoChasing = false,
     this.autoChaseMaxDepth = 0,
+    this.autoChaseCurrentDepth = 0,
   });
 
   final List<PointerChainLayerState> layers;
   final int currentLayerIndex;
   final bool isAutoChasing;
   final int autoChaseMaxDepth;
+  final int autoChaseCurrentDepth;
 
   PointerChainLayerState? get currentLayer {
     if (currentLayerIndex < 0 || currentLayerIndex >= layers.length) {
@@ -95,12 +101,15 @@ class MemoryToolPointerState {
     int? currentLayerIndex,
     bool? isAutoChasing,
     int? autoChaseMaxDepth,
+    int? autoChaseCurrentDepth,
   }) {
     return MemoryToolPointerState(
       layers: layers ?? this.layers,
       currentLayerIndex: currentLayerIndex ?? this.currentLayerIndex,
       isAutoChasing: isAutoChasing ?? this.isAutoChasing,
       autoChaseMaxDepth: autoChaseMaxDepth ?? this.autoChaseMaxDepth,
+      autoChaseCurrentDepth:
+          autoChaseCurrentDepth ?? this.autoChaseCurrentDepth,
     );
   }
 }

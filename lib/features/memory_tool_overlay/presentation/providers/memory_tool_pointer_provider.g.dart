@@ -199,7 +199,7 @@ final class MemoryToolPointerControllerProvider
 }
 
 String _$memoryToolPointerControllerHash() =>
-    r'2cd0daf2405808c4070409919e1fa4020e93d2de';
+    r'fb4919a0f7104c409adc22098c844f2efed49472';
 
 abstract class _$MemoryToolPointerController
     extends $Notifier<MemoryToolPointerState> {

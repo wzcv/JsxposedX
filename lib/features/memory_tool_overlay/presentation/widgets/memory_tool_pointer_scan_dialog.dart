@@ -97,12 +97,15 @@ class MemoryToolPointerScanDialog extends HookConsumerWidget {
         if (maxDepth == null) {
           return;
         }
+        if (context.mounted) {
+          onClose();
+        }
         await onConfirmAutoChase!(request, maxDepth);
       } else {
+        if (context.mounted) {
+          onClose();
+        }
         await onConfirm!(request);
-      }
-      if (context.mounted) {
-        onClose();
       }
     }
 
