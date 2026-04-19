@@ -26,7 +26,7 @@ permissions:
 
 jobs:
   build:
-    name: Build APK (${{ matrix.flavor }})
+    name: Build APK (${{ matrix.flavor }} - ${{ matrix.abi_name }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -34,6 +34,21 @@ jobs:
         flavor:
           - api100
           - api101
+        abi:
+          - android-arm64
+          - android-arm
+          - android-x64
+          - android-arm64,android-arm,android-x64
+        include:
+          # 为每个 abi 值映射可读名称
+          - abi: android-arm64
+            abi_name: arm64-v8a
+          - abi: android-arm
+            abi_name: armeabi-v7a
+          - abi: android-x64
+            abi_name: x86_64
+          - abi: android-arm64,android-arm,android-x64
+            abi_name: universal
         exclude:
           # workflow_dispatch 手动触发时，根据选择排除不需要的 flavor
           - flavor: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_flavor == 'api101' && 'api100' || 'NONE' }}
@@ -76,15 +91,19 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
           echo "$KEY_PROPERTIES" > android/key.properties
 
-      - name: Build APK (${{ matrix.flavor }})
-        run: flutter build apk --flavor ${{ matrix.flavor }} --release
+      - name: Build APK (${{ matrix.flavor }} - ${{ matrix.abi_name }})
+        run: |
+          flutter build apk \
+            --flavor ${{ matrix.flavor }} \
+            --release \
+            --target-platform ${{ matrix.abi }}
 
       - name: Rename APK
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //')
           VERSION_NAME=$(echo $VERSION | cut -d'+' -f1)
           APK_SRC="build/app/outputs/flutter-apk/app-${{ matrix.flavor }}-release.apk"
-          APK_DST="JsxposedX-v${VERSION_NAME}-${{ matrix.flavor }}-release.apk"
+          APK_DST="JsxposedX-v${VERSION_NAME}-${{ matrix.flavor }}-${{ matrix.abi_name }}.apk"
           cp "$APK_SRC" "$APK_DST"
           echo "APK_PATH=$APK_DST" >> $GITHUB_ENV
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
@@ -92,7 +111,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: apk-${{ matrix.flavor }}
+          name: apk-${{ matrix.flavor }}-${{ matrix.abi_name }}
           path: ${{ env.APK_PATH }}
           retention-days: 30
 
@@ -104,6 +123,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Extract version info
         id: version
@@ -141,6 +162,15 @@ jobs:
               echo "## What's Changed"
               echo ""
               echo "$CHANGELOG"
+              echo ""
+              echo "---"
+              echo "### 📦 APK 说明"
+              echo "| 文件 | 说明 |"
+              echo "|------|------|"
+              echo "| \`*-arm64-v8a.apk\` | 64位 ARM 设备（推荐，现代手机） |"
+              echo "| \`*-armeabi-v7a.apk\` | 32位 ARM 设备（旧设备） |"
+              echo "| \`*-x86_64.apk\` | x86_64 设备（模拟器） |"
+              echo "| \`*-universal.apk\` | 全架构通用包（体积较大） |"
               echo ""
               echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${{ steps.version.outputs.tag }}"
               echo "CHANGELOG_EOF"
