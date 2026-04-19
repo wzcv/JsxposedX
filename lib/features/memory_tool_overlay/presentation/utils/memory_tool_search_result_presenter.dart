@@ -10,11 +10,28 @@ String resolveMemoryToolSearchResultDisplayValue({
   required SearchResult result,
   required AsyncValue<Map<int, MemoryValuePreview>> livePreviewsAsync,
 }) {
+  final fallbackDisplayValue = result.displayValue;
   return livePreviewsAsync.when(
-    data: (previews) => previews[result.address]?.displayValue ?? '--',
-    error: (_, _) => '--',
-    loading: () => '...',
+    data: (previews) => resolveMemoryToolPreferredDisplayValue(
+      result: result,
+      livePreview: previews[result.address],
+      fallbackDisplayValue: fallbackDisplayValue,
+    ),
+    error: (_, _) => fallbackDisplayValue,
+    loading: () => fallbackDisplayValue,
   );
+}
+
+String resolveMemoryToolPreferredDisplayValue({
+  required SearchResult result,
+  required MemoryValuePreview? livePreview,
+  required String fallbackDisplayValue,
+}) {
+  if (result.type == SearchValueType.bytes &&
+      isMemoryToolInstructionDisplayValue(fallbackDisplayValue)) {
+    return fallbackDisplayValue;
+  }
+  return livePreview?.displayValue ?? fallbackDisplayValue;
 }
 
 String resolveMemoryToolSearchResultValueByType({
@@ -234,7 +251,9 @@ String mapMemoryToolSearchResultTypeLabel({
     SearchValueType.i64 => 'I64',
     SearchValueType.f32 => 'F32',
     SearchValueType.f64 => 'F64',
-    SearchValueType.bytes => _looksLikeHexByteSequence(displayValue)
+    SearchValueType.bytes => isMemoryToolInstructionDisplayValue(displayValue)
+        ? 'ASM'
+        : _looksLikeHexByteSequence(displayValue)
         ? 'AOB'
         : 'TEXT',
   };
@@ -319,6 +338,51 @@ bool _looksLikeHexByteSequence(String value) {
   }
   return RegExp(r'^[0-9A-F]{2}( [0-9A-F]{2})*$').hasMatch(normalized);
 }
+
+bool isMemoryToolInstructionDisplayValue(String value) {
+  final normalized = value.trim();
+  if (normalized.isEmpty || _looksLikeHexByteSequence(normalized)) {
+    return false;
+  }
+
+  final mnemonicMatch = RegExp(
+    r'^([A-Za-z][A-Za-z0-9.]{1,11})(?:\s+(.*))?$',
+  ).firstMatch(normalized);
+  if (mnemonicMatch == null) {
+    return false;
+  }
+
+  final mnemonic = (mnemonicMatch.group(1) ?? '').toLowerCase();
+  final operands = (mnemonicMatch.group(2) ?? '').trim();
+  if (_memoryToolZeroOperandInstructionMnemonics.contains(mnemonic)) {
+    return operands.isEmpty;
+  }
+
+  if (operands.isEmpty) {
+    return false;
+  }
+
+  return RegExp(
+    r'\b(?:r\d+|w\d+|x\d+|q\d+|d\d+|s\d+|v\d+|p\d+|sp|pc|lr|fp)\b|[\[\],#]',
+    caseSensitive: false,
+  ).hasMatch(operands);
+}
+
+const Set<String> _memoryToolZeroOperandInstructionMnemonics = <String>{
+  'nop',
+  'ret',
+  'hlt',
+  'brk',
+  'yield',
+  'wfe',
+  'wfi',
+  'sev',
+  'sevl',
+  'clrex',
+  'isb',
+  'dsb',
+  'dmb',
+};
 
 String _formatFloatingValue(double value) {
   final normalized = value.toStringAsPrecision(12);

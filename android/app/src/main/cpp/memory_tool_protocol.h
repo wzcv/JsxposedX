@@ -26,6 +26,16 @@ std::string SerializePointerScanChaseHint(const PointerScanChaseHintView& hint);
 
 std::string SerializePointerAutoChaseState(const PointerAutoChaseStateView& state);
 
+std::string SerializeMemoryBreakpoints(const std::vector<MemoryBreakpointView>& breakpoints);
+
+std::string SerializeMemoryBreakpointState(const MemoryBreakpointStateView& state);
+
+std::string SerializeMemoryBreakpointHits(const std::vector<MemoryBreakpointHitView>& hits);
+
+std::string SerializeInstructionPatchResult(const InstructionPatchResultView& result);
+
+std::string SerializeMemoryInstructions(const std::vector<MemoryInstructionView>& instructions);
+
 std::string SerializeMemoryValuePreviews(const std::vector<MemoryValuePreview>& previews);
 
 std::string SerializeFrozenMemoryValues(const std::vector<FrozenMemoryValueView>& values);

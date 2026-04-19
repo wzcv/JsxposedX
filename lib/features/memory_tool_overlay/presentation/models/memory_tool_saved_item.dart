@@ -12,6 +12,8 @@ class MemoryToolSavedItem {
     required this.rawBytes,
     required this.displayValue,
     required this.isFrozen,
+    this.isInstructionPatch = false,
+    this.instructionText,
   });
 
   final int pid;
@@ -22,12 +24,24 @@ class MemoryToolSavedItem {
   final Uint8List rawBytes;
   final String displayValue;
   final bool isFrozen;
+  final bool isInstructionPatch;
+  final String? instructionText;
+
+  String get effectiveInstructionText {
+    final value = instructionText?.trim();
+    if (value != null && value.isNotEmpty) {
+      return value;
+    }
+    return displayValue;
+  }
 
   factory MemoryToolSavedItem.fromSearchResult({
     required int pid,
     required SearchResult result,
     MemoryValuePreview? preview,
     required bool isFrozen,
+    bool isInstructionPatch = false,
+    String? instructionText,
   }) {
     return MemoryToolSavedItem(
       pid: pid,
@@ -36,8 +50,13 @@ class MemoryToolSavedItem {
       regionTypeKey: result.regionTypeKey,
       type: preview?.type ?? result.type,
       rawBytes: preview?.rawBytes ?? result.rawBytes,
-      displayValue: preview?.displayValue ?? result.displayValue,
+      displayValue:
+          instructionText ??
+          preview?.displayValue ??
+          result.displayValue,
       isFrozen: isFrozen,
+      isInstructionPatch: isInstructionPatch,
+      instructionText: instructionText,
     );
   }
 
@@ -50,6 +69,8 @@ class MemoryToolSavedItem {
     Uint8List? rawBytes,
     String? displayValue,
     bool? isFrozen,
+    bool? isInstructionPatch,
+    String? instructionText,
   }) {
     return MemoryToolSavedItem(
       pid: pid ?? this.pid,
@@ -60,6 +81,8 @@ class MemoryToolSavedItem {
       rawBytes: rawBytes ?? this.rawBytes,
       displayValue: displayValue ?? this.displayValue,
       isFrozen: isFrozen ?? this.isFrozen,
+      isInstructionPatch: isInstructionPatch ?? this.isInstructionPatch,
+      instructionText: instructionText ?? this.instructionText,
     );
   }
 

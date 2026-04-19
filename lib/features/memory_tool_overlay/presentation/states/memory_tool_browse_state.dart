@@ -1,11 +1,12 @@
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/models/memory_tool_display_item.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/states/memory_tool_result_selection_state.dart';
 import 'package:JsxposedX/generated/memory_tool.g.dart';
 
 class MemoryToolBrowseState {
   const MemoryToolBrowseState({
-    this.anchorResult,
+    this.anchorItem,
     this.regions = const <MemoryRegion>[],
-    this.results = const <SearchResult>[],
+    this.results = const <MemoryToolDisplayItem>[],
     this.selectionState = const MemoryToolResultSelectionState(),
     this.hiddenAddresses = const <int>{},
     this.focusRequestId = 0,
@@ -19,9 +20,9 @@ class MemoryToolBrowseState {
     this.errorText,
   });
 
-  final SearchResult? anchorResult;
+  final MemoryToolDisplayItem? anchorItem;
   final List<MemoryRegion> regions;
-  final List<SearchResult> results;
+  final List<MemoryToolDisplayItem> results;
   final MemoryToolResultSelectionState selectionState;
   final Set<int> hiddenAddresses;
   final int focusRequestId;
@@ -34,25 +35,27 @@ class MemoryToolBrowseState {
   final bool reachedBottomBoundary;
   final String? errorText;
 
-  bool get hasAnchor => anchorResult != null;
+  bool get hasAnchor => anchorItem != null;
 
-  int? get anchorAddress => anchorResult?.address;
+  int? get anchorAddress => anchorItem?.address;
 
   int get strideBytes {
-    final rawBytes = anchorResult?.rawBytes;
+    final rawBytes = anchorItem?.rawBytes;
     if (rawBytes == null || rawBytes.isEmpty) {
       return 1;
     }
     return rawBytes.length;
   }
 
-  SearchValueType get browseType => anchorResult?.type ?? SearchValueType.i32;
+  SearchValueType get browseType => anchorItem?.type ?? SearchValueType.i32;
+
+  bool get isInstructionMode => anchorItem?.isInstruction ?? false;
 
   MemoryToolBrowseState copyWith({
-    SearchResult? anchorResult,
-    bool clearAnchorResult = false,
+    MemoryToolDisplayItem? anchorItem,
+    bool clearAnchorItem = false,
     List<MemoryRegion>? regions,
-    List<SearchResult>? results,
+    List<MemoryToolDisplayItem>? results,
     MemoryToolResultSelectionState? selectionState,
     Set<int>? hiddenAddresses,
     int? focusRequestId,
@@ -67,7 +70,7 @@ class MemoryToolBrowseState {
     bool clearErrorText = false,
   }) {
     return MemoryToolBrowseState(
-      anchorResult: clearAnchorResult ? null : anchorResult ?? this.anchorResult,
+      anchorItem: clearAnchorItem ? null : anchorItem ?? this.anchorItem,
       regions: regions ?? this.regions,
       results: results ?? this.results,
       selectionState: selectionState ?? this.selectionState,

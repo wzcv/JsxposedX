@@ -37,7 +37,11 @@ class MemoryToolSearchResultDialog extends HookConsumerWidget {
     final livePreview = livePreviewsAsync.asData?.value[result.address];
     final sourceRawBytes = livePreview?.rawBytes ?? result.rawBytes;
     final sourceType = livePreview?.type ?? result.type;
-    final sourceDisplayValue = livePreview?.displayValue ?? displayValue;
+    final sourceDisplayValue = resolveMemoryToolPreferredDisplayValue(
+      result: result,
+      livePreview: livePreview,
+      fallbackDisplayValue: displayValue,
+    );
     final sourceBytesLength = sourceRawBytes.length;
     final searchSessionStateAsync = ref.watch(getSearchSessionStateProvider);
     final frozenValuesAsync = ref.watch(currentFrozenMemoryValuesProvider);

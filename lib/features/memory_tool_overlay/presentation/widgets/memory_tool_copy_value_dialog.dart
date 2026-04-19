@@ -31,7 +31,11 @@ class MemoryToolCopyValueDialog extends HookConsumerWidget {
     final selectedPid = ref.watch(memoryToolSelectedProcessProvider)?.pid;
     final livePreview = livePreviewsAsync.asData?.value[result.address];
     final currentRawBytes = livePreview?.rawBytes ?? result.rawBytes;
-    final currentDisplayValue = livePreview?.displayValue ?? displayValue;
+    final currentDisplayValue = resolveMemoryToolPreferredDisplayValue(
+      result: result,
+      livePreview: livePreview,
+      fallbackDisplayValue: displayValue,
+    );
     final currentType = livePreview?.type ?? result.type;
     final previewRequests = useMemoized(
       () => SearchValueType.values

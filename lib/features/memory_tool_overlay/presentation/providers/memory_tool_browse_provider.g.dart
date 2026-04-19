@@ -15,11 +15,11 @@ const currentBrowseResultsProvider = CurrentBrowseResultsProvider._();
 final class CurrentBrowseResultsProvider
     extends
         $FunctionalProvider<
-          List<SearchResult>,
-          List<SearchResult>,
-          List<SearchResult>
+          List<MemoryToolDisplayItem>,
+          List<MemoryToolDisplayItem>,
+          List<MemoryToolDisplayItem>
         >
-    with $Provider<List<SearchResult>> {
+    with $Provider<List<MemoryToolDisplayItem>> {
   const CurrentBrowseResultsProvider._()
     : super(
         from: null,
@@ -36,26 +36,26 @@ final class CurrentBrowseResultsProvider
 
   @$internal
   @override
-  $ProviderElement<List<SearchResult>> $createElement(
+  $ProviderElement<List<MemoryToolDisplayItem>> $createElement(
     $ProviderPointer pointer,
   ) => $ProviderElement(pointer);
 
   @override
-  List<SearchResult> create(Ref ref) {
+  List<MemoryToolDisplayItem> create(Ref ref) {
     return currentBrowseResults(ref);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(List<SearchResult> value) {
+  Override overrideWithValue(List<MemoryToolDisplayItem> value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<List<SearchResult>>(value),
+      providerOverride: $SyncValueProvider<List<MemoryToolDisplayItem>>(value),
     );
   }
 }
 
 String _$currentBrowseResultsHash() =>
-    r'77a5461cc7a0774f1b1d71ecd171fa1f2c2c55a6';
+    r'b9fb2c170bd47544c1a1e559b7558e98f10229bc';
 
 @ProviderFor(currentBrowseResultLivePreviews)
 const currentBrowseResultLivePreviewsProvider =
@@ -98,7 +98,7 @@ final class CurrentBrowseResultLivePreviewsProvider
 }
 
 String _$currentBrowseResultLivePreviewsHash() =>
-    r'8b14b806c971456bb497547879b033975921cd64';
+    r'ab3a80bc084e8a94adf538f7474e6137d7e93164';
 
 @ProviderFor(MemoryToolBrowseController)
 const memoryToolBrowseControllerProvider =
@@ -135,7 +135,7 @@ final class MemoryToolBrowseControllerProvider
 }
 
 String _$memoryToolBrowseControllerHash() =>
-    r'9a413b1dfe6ed079b29c3eb8930306e3be444e55';
+    r'465d3cd0096af74bd500588c40aac003c6671e27';
 
 abstract class _$MemoryToolBrowseController
     extends $Notifier<MemoryToolBrowseState> {

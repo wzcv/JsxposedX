@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "memory_tool_reader.h"
+#include "memory_tool_instruction.h"
 #include "memory_tool_regions.h"
 #include "memory_tool_value.h"
 
@@ -242,11 +243,22 @@ bool IsBetterPointerResult(const PointerScanResultEntry& candidate,
     return candidate.pointer_address < current.pointer_address;
 }
 
-const PointerScanResultEntry* SelectBestPointerResult(
-    const std::vector<PointerScanResultEntry>& results) {
+bool IsSamePointerResult(const PointerScanResultEntry& left,
+                         const PointerScanResultEntry& right) {
+    return left.pointer_address == right.pointer_address &&
+           left.base_address == right.base_address &&
+           left.target_address == right.target_address &&
+           left.offset == right.offset &&
+           left.region_start == right.region_start &&
+           left.region_type_key == right.region_type_key;
+}
+
+const PointerScanResultEntry* SelectBestPointerResultImpl(
+    const std::vector<PointerScanResultEntry>& results,
+    bool recommended_only) {
     const PointerScanResultEntry* best_entry = nullptr;
     for (const PointerScanResultEntry& entry : results) {
-        if (!IsPointerRecommendedRegionKey(entry.region_type_key)) {
+        if (recommended_only && !IsPointerRecommendedRegionKey(entry.region_type_key)) {
             continue;
         }
         if (best_entry == nullptr || IsBetterPointerResult(entry, *best_entry)) {
@@ -254,6 +266,16 @@ const PointerScanResultEntry* SelectBestPointerResult(
         }
     }
     return best_entry;
+}
+
+const PointerScanResultEntry* SelectBestPointerResult(
+    const std::vector<PointerScanResultEntry>& results) {
+    if (const PointerScanResultEntry* best_recommended =
+            SelectBestPointerResultImpl(results, true);
+        best_recommended != nullptr) {
+        return best_recommended;
+    }
+    return SelectBestPointerResultImpl(results, false);
 }
 
 template <typename ProgressCallback>
@@ -544,11 +566,24 @@ PointerAutoChaseLayerStateView BuildPointerAutoChaseLayer(
     layer.is_terminal_layer = is_terminal_layer;
     layer.stop_reason_key = stop_reason_key;
     layer.results = results;
-    const size_t initial_count =
-        std::min(results.size(), static_cast<size_t>(kPointerAutoChaseInitialResultLimit));
-    layer.initial_results.assign(results.begin(),
-                                 results.begin() + static_cast<std::ptrdiff_t>(initial_count));
     if (const PointerScanResultEntry* best_entry = SelectBestPointerResult(results);
+        best_entry != nullptr) {
+        const auto selected_iterator = std::find_if(
+            layer.results.begin(),
+            layer.results.end(),
+            [best_entry](const PointerScanResultEntry& entry) {
+                return IsSamePointerResult(entry, *best_entry);
+            });
+        if (selected_iterator != layer.results.end() &&
+            selected_iterator != layer.results.begin()) {
+            std::iter_swap(layer.results.begin(), selected_iterator);
+        }
+    }
+    const size_t initial_count =
+        std::min(layer.results.size(), static_cast<size_t>(kPointerAutoChaseInitialResultLimit));
+    layer.initial_results.assign(layer.results.begin(),
+                                 layer.results.begin() + static_cast<std::ptrdiff_t>(initial_count));
+    if (const PointerScanResultEntry* best_entry = SelectBestPointerResult(layer.results);
         best_entry != nullptr) {
         layer.has_selected_pointer_address = true;
         layer.selected_pointer_address = best_entry->pointer_address;
@@ -866,6 +901,112 @@ std::vector<PointerScanResultEntry> MemoryToolEngine::GetPointerAutoChaseLayerRe
     return std::vector<PointerScanResultEntry>(
         results.begin() + static_cast<std::ptrdiff_t>(start),
         results.begin() + static_cast<std::ptrdiff_t>(end));
+}
+
+MemoryBreakpointView MemoryToolEngine::AddMemoryBreakpoint(
+    const AddMemoryBreakpointRequest& request) {
+    return breakpoint_controller_.AddBreakpoint(request);
+}
+
+void MemoryToolEngine::RemoveMemoryBreakpoint(const std::string& breakpoint_id) {
+    breakpoint_controller_.RemoveBreakpoint(breakpoint_id);
+}
+
+void MemoryToolEngine::SetMemoryBreakpointEnabled(const std::string& breakpoint_id,
+                                                  bool enabled) {
+    breakpoint_controller_.SetBreakpointEnabled(breakpoint_id, enabled);
+}
+
+std::vector<MemoryBreakpointView> MemoryToolEngine::ListMemoryBreakpoints(int pid) {
+    return breakpoint_controller_.ListBreakpoints(pid);
+}
+
+MemoryBreakpointStateView MemoryToolEngine::GetMemoryBreakpointState(int pid) {
+    return breakpoint_controller_.GetState(pid);
+}
+
+std::vector<MemoryBreakpointHitView> MemoryToolEngine::GetMemoryBreakpointHits(int pid,
+                                                                               int offset,
+                                                                               int limit) {
+    return breakpoint_controller_.GetHits(pid, offset, limit);
+}
+
+void MemoryToolEngine::ClearMemoryBreakpointHits(int pid) {
+    breakpoint_controller_.ClearHits(pid);
+}
+
+void MemoryToolEngine::ResumeAfterBreakpoint(int pid) {
+    breakpoint_controller_.ResumeAfterBreakpoint(pid);
+}
+
+InstructionPatchResultView MemoryToolEngine::PatchMemoryInstruction(
+    int pid,
+    uint64_t address,
+    const std::string& input_text) {
+    if (pid <= 0) {
+        throw std::runtime_error("Invalid process id.");
+    }
+    if (address == 0) {
+        throw std::runtime_error("Invalid instruction address.");
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!IsProcessAlive(pid)) {
+            if (session_.pid == pid) {
+                session_.Clear();
+            }
+            if (pointer_session_.pid == pid) {
+                pointer_session_.Clear();
+            }
+            throw std::runtime_error("Target process is no longer available.");
+        }
+    }
+
+    return PatchMemoryInstructionAtAddress(pid, address, input_text);
+}
+
+std::vector<MemoryInstructionView> MemoryToolEngine::DisassembleMemory(
+    int pid,
+    const std::vector<uint64_t>& addresses) {
+    if (pid <= 0) {
+        throw std::runtime_error("Invalid process id.");
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!IsProcessAlive(pid)) {
+            if (session_.pid == pid) {
+                session_.Clear();
+            }
+            if (pointer_session_.pid == pid) {
+                pointer_session_.Clear();
+            }
+            throw std::runtime_error("Target process is no longer available.");
+        }
+    }
+
+    std::vector<MemoryInstructionView> instructions;
+    instructions.reserve(addresses.size());
+    for (uint64_t address : addresses) {
+        if (address == 0) {
+            continue;
+        }
+
+        const MemoryInstructionInfo info = ReadMemoryInstruction(pid, address);
+        if (!info.is_valid || info.raw_bytes.empty()) {
+            continue;
+        }
+
+        MemoryInstructionView instruction;
+        instruction.address = address;
+        instruction.architecture = info.architecture;
+        instruction.instruction_size = info.size;
+        instruction.raw_bytes = info.raw_bytes;
+        instruction.instruction_text = info.text;
+        instructions.push_back(std::move(instruction));
+    }
+    return instructions;
 }
 
 std::vector<MemoryValuePreview> MemoryToolEngine::ReadMemoryValues(

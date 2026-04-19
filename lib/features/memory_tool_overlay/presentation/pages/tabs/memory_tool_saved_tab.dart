@@ -1,12 +1,20 @@
+import 'dart:async';
+import 'dart:typed_data';
+
+import 'package:JsxposedX/common/pages/toast.dart';
 import 'package:JsxposedX/core/extensions/context_extensions.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/models/memory_tool_saved_item.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_action_provider.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_breakpoint_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_browse_provider.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_instruction_history_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_pointer_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_saved_items_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_query_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/utils/memory_tool_pointer_utils.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_batch_edit_dialog.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_breakpoint_config_dialog.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_debug_instruction_editor_dialog.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_copy_value_dialog.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_offset_preview_dialog.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_pointer_scan_dialog.dart';
@@ -19,7 +27,12 @@ import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memo
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/utils/memory_tool_search_result_presenter.dart';
 import 'package:JsxposedX/features/overlay_window/presentation/providers/overlay_window_host_runtime_provider.dart';
 import 'package:JsxposedX/generated/memory_tool.g.dart'
-    show MemoryValuePreview, PointerScanRequest, SearchResult;
+    show
+        MemoryInstructionPreview,
+        MemoryValuePreview,
+        SearchResult,
+        SearchValueType,
+        MemoryInstructionPatchRequest;
 import 'package:flutter/material.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -31,26 +44,41 @@ class MemoryToolSavedTab extends HookConsumerWidget {
     super.key,
     required this.onOpenBrowseTab,
     required this.onOpenPointerTab,
+    required this.onOpenDebugTab,
   });
 
   final VoidCallback onOpenBrowseTab;
   final VoidCallback onOpenPointerTab;
+  final VoidCallback onOpenDebugTab;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     useAutomaticKeepAlive();
     final selectedProcess = ref.watch(memoryToolSelectedProcessProvider);
+    final selectedPid = selectedProcess?.pid;
     final savedItems = ref.watch(savedItemsForSelectedProcessProvider);
     final selectionState = ref.watch(memoryToolSavedItemSelectionProvider);
     final selectionNotifier = ref.read(
       memoryToolSavedItemSelectionProvider.notifier,
     );
     final savedItemsNotifier = ref.read(memoryToolSavedItemsProvider.notifier);
-    final browseNotifier = ref.read(memoryToolBrowseControllerProvider.notifier);
-    final pointerNotifier = ref.read(memoryToolPointerControllerProvider.notifier);
+    final browseNotifier = ref.read(
+      memoryToolBrowseControllerProvider.notifier,
+    );
+    final pointerNotifier = ref.read(
+      memoryToolPointerControllerProvider.notifier,
+    );
     final livePreviewsAsync = ref.watch(currentSavedItemLivePreviewsProvider);
     final frozenValuesAsync = ref.watch(currentFrozenMemoryValuesProvider);
     final valueHistoryState = ref.watch(memoryValueHistoryProvider);
+    final instructionHistoryByAddress = ref.watch(
+      memoryToolInstructionHistoryProvider.select(
+        (state) => selectedPid == null
+            ? const <int, MemoryToolInstructionHistoryEntry>{}
+            : (state.entriesByPid[selectedPid] ??
+                  const <int, MemoryToolInstructionHistoryEntry>{}),
+      ),
+    );
     final valueActionState = ref.watch(memoryValueActionProvider);
     final isBatchEditVisible = useState(false);
     final isCalculatorVisible = useState(false);
@@ -64,32 +92,84 @@ class MemoryToolSavedTab extends HookConsumerWidget {
         useState<({MemoryToolSavedItem item, String displayValue})?>(null);
     final activeAutoChaseDialog = useState<MemoryToolSavedItem?>(null);
     final activePointerScanDialog = useState<MemoryToolSavedItem?>(null);
+    final activeBreakpointDialog = useState<MemoryToolSavedItem?>(null);
+    final activeInstructionEditor = useState<MemoryToolSavedItem?>(null);
 
     useEffect(() {
       selectionNotifier.retainVisible(
         savedItems.map((item) => item.address).toList(growable: false),
       );
       return null;
-    }, [selectedProcess?.pid, savedItems]);
+    }, [selectedPid, savedItems]);
 
     final previewMap =
         livePreviewsAsync.asData?.value ?? const <int, MemoryValuePreview>{};
-    final currentFrozenAddresses = selectedProcess == null
+    final savedInstructionItems = savedItems
+        .where((item) => item.isInstructionPatch)
+        .toList(growable: false);
+    final instructionPreviewFuture = useMemoized(() async {
+      if (selectedPid == null || savedInstructionItems.isEmpty) {
+        return <int, MemoryInstructionPreview>{};
+      }
+      final previews = await ref
+          .read(memoryQueryRepositoryProvider)
+          .disassembleMemory(
+            pid: selectedPid,
+            addresses: savedInstructionItems
+                .map((item) => item.address)
+                .toList(growable: false),
+          );
+      return <int, MemoryInstructionPreview>{
+        for (final preview in previews) preview.address: preview,
+      };
+    }, <Object>[
+      selectedPid ?? 0,
+      savedInstructionItems
+          .map((item) => '${item.address}:${item.effectiveInstructionText}')
+          .join('|'),
+    ]);
+    final instructionPreviewSnapshot = useFuture(instructionPreviewFuture);
+    final instructionPreviewMap =
+        instructionPreviewSnapshot.data ?? const <int, MemoryInstructionPreview>{};
+    final currentFrozenAddresses = selectedPid == null
         ? null
         : frozenValuesAsync.asData?.value
-              ?.where((value) => value.pid == selectedProcess.pid)
+              ?.where((value) => value.pid == selectedPid)
               .map((value) => value.address)
               .toSet();
     final selectedItems = savedItems
         .where((item) => selectionState.contains(item.address))
         .toList(growable: false);
+    final selectedInstructionItems = selectedItems
+        .where((item) => item.isInstructionPatch)
+        .toList(growable: false);
+    final selectedValueItems = selectedItems
+        .where((item) => !item.isInstructionPatch)
+        .toList(growable: false);
+    final totalSavedEntryCount = savedItems.length;
+    final totalListItemCount = totalSavedEntryCount;
     final previousValueByAddress = <int, String>{
       for (final entry in valueHistoryState.entries)
         entry.key: entry.value.displayValue,
     };
-    final canRestorePrevious = selectionState.selectedAddresses.any(
-      valueHistoryState.containsKey,
+    final canRestorePrevious = selectedItems.any(
+      (item) => item.isInstructionPatch
+          ? instructionHistoryByAddress.containsKey(item.address)
+          : valueHistoryState.containsKey(item.address),
     );
+    final totalSelectedCount = selectionState.selectedCount;
+
+    void clearAllSelection() {
+      selectionNotifier.clearSelection();
+    }
+
+    void selectAllVisible() {
+      selectionNotifier.selectVisible(savedItems.map((item) => item.address));
+    }
+
+    void invertAllVisible() {
+      selectionNotifier.invertVisible(savedItems.map((item) => item.address));
+    }
 
     Future<void> restoreAddresses(List<int> addresses) async {
       try {
@@ -114,9 +194,9 @@ class MemoryToolSavedTab extends HookConsumerWidget {
 
     Future<void> copyText(String value) async {
       final copied = await FlutterOverlayWindow.setClipboardData(value);
-      ref.read(overlayWindowHostRuntimeProvider.notifier).showToast(
-        copied ? context.l10n.codeCopied : context.l10n.error,
-      );
+      ref
+          .read(overlayWindowHostRuntimeProvider.notifier)
+          .showToast(copied ? context.l10n.codeCopied : context.l10n.error);
     }
 
     Future<void> previewAndOpenBrowse(
@@ -135,13 +215,37 @@ class MemoryToolSavedTab extends HookConsumerWidget {
       }
     }
 
-    Future<void> jumpToPointer(
-      MemoryToolSavedItem item,
-      String displayValue,
-    ) async {
+    String resolveSavedItemDisplayValue(MemoryToolSavedItem item) {
+      if (!item.isInstructionPatch) {
+        return previewMap[item.address]?.displayValue ?? item.displayValue;
+      }
+      return instructionPreviewMap[item.address]?.instructionText ??
+          item.effectiveInstructionText;
+    }
+
+    Uint8List resolveSavedItemRawBytes(MemoryToolSavedItem item) {
+      if (!item.isInstructionPatch) {
+        return previewMap[item.address]?.rawBytes ?? item.rawBytes;
+      }
+      return instructionPreviewMap[item.address]?.rawBytes ?? item.rawBytes;
+    }
+
+    MemoryToolSavedItem resolveSavedItem(MemoryToolSavedItem item) {
+      return item.copyWith(
+        rawBytes: resolveSavedItemRawBytes(item),
+        displayValue: resolveSavedItemDisplayValue(item),
+        instructionText: item.isInstructionPatch
+            ? resolveSavedItemDisplayValue(item)
+            : item.instructionText,
+      );
+    }
+
+    Future<void> jumpToPointer(MemoryToolSavedItem item) async {
       final preview = previewMap[item.address];
       final targetAddress = decodeMemoryToolPointerAddress(
-        preview?.rawBytes ?? item.rawBytes,
+        item.isInstructionPatch
+            ? resolveSavedItemRawBytes(item)
+            : (preview?.rawBytes ?? item.rawBytes),
       );
       if (targetAddress == null) {
         ref
@@ -152,14 +256,155 @@ class MemoryToolSavedTab extends HookConsumerWidget {
 
       await previewAndOpenBrowse(
         () => browseNotifier.previewFromAddress(
-          sourceResult: item.toSearchResult(),
+          sourceResult: resolveSavedItem(item).toSearchResult(),
           sourcePreview: preview,
           targetAddress: targetAddress,
+          preferInstructionMode: item.isInstructionPatch,
         ),
       );
     }
 
-    if (selectedProcess == null) {
+    Future<String?> saveInstructionPatch(
+      MemoryToolSavedItem item,
+      String value,
+    ) async {
+      final trimmedValue = value.trim();
+      if (selectedPid == null) {
+        return context.l10n.selectApp;
+      }
+      final failurePrefix = context.isZh ? '修改失败' : 'Patch failed';
+      final fallbackErrorMessage = context.l10n.error;
+      try {
+        final result = await ref
+            .read(memoryValueActionProvider.notifier)
+            .patchMemoryInstruction(
+              request: MemoryInstructionPatchRequest(
+                pid: selectedPid,
+                address: item.address,
+                instruction: trimmedValue,
+              ),
+            );
+        ref
+            .read(memoryToolInstructionHistoryProvider.notifier)
+            .record(
+              pid: selectedPid,
+              address: item.address,
+              previousBytes: result.beforeBytes,
+              previousDisplayValue: item.effectiveInstructionText,
+            );
+        final patchedResult = SearchResult(
+          address: item.address,
+          regionStart: item.regionStart,
+          regionTypeKey: item.regionTypeKey,
+          type: SearchValueType.bytes,
+          rawBytes: result.afterBytes,
+          displayValue: result.instructionText,
+        );
+        savedItemsNotifier.saveOne(
+          pid: selectedPid,
+          result: patchedResult,
+          isFrozen: false,
+          isInstructionPatch: true,
+          instructionText: result.instructionText,
+        );
+        ref.invalidate(getMemoryBreakpointStateProvider(pid: selectedPid));
+        ref.invalidate(getMemoryBreakpointsProvider(pid: selectedPid));
+        ref.invalidate(getMemoryBreakpointHitsProvider(pid: selectedPid));
+        await browseNotifier.refreshInstructionBrowseWindowIfVisible(
+          sourceResult: patchedResult,
+          instructionText: result.instructionText,
+        );
+        activeInstructionEditor.value = null;
+        unawaited(
+          ToastOverlayMessage.show(
+            context.isZh ? '指令已修改' : 'Instruction patched',
+            duration: const Duration(milliseconds: 1200),
+          ),
+        );
+        return null;
+      } catch (error) {
+        final message = error.toString().replaceFirst('Exception: ', '').trim();
+        final resolvedMessage = message.isEmpty
+            ? fallbackErrorMessage
+            : message;
+        unawaited(
+          ToastOverlayMessage.show(
+            '$failurePrefix: $resolvedMessage',
+            duration: const Duration(milliseconds: 1600),
+          ),
+        );
+        return resolvedMessage;
+      }
+    }
+
+    String encodeInstructionBytesHex(Uint8List bytes) {
+      return <String>[
+        for (final byte in bytes) byte.toRadixString(16).padLeft(2, '0'),
+      ].join(' ');
+    }
+
+    Future<void> restoreInstructionPatches(
+      List<MemoryToolSavedItem> items,
+    ) async {
+      if (selectedPid == null) {
+        return;
+      }
+      var hasPatchedInstruction = false;
+      for (final item in items) {
+        final entry = instructionHistoryByAddress[item.address];
+        if (entry == null) {
+          continue;
+        }
+        try {
+          final result = await ref
+              .read(memoryValueActionProvider.notifier)
+              .patchMemoryInstruction(
+                request: MemoryInstructionPatchRequest(
+                  pid: selectedPid,
+                  address: entry.address,
+                  instruction: encodeInstructionBytesHex(entry.previousBytes),
+                ),
+              );
+          ref
+              .read(memoryToolInstructionHistoryProvider.notifier)
+              .record(
+                pid: selectedPid,
+                address: entry.address,
+                previousBytes: result.beforeBytes,
+                previousDisplayValue: item.effectiveInstructionText,
+              );
+          final patchedResult = SearchResult(
+            address: entry.address,
+            regionStart: item.regionStart,
+            regionTypeKey: item.regionTypeKey,
+            type: SearchValueType.bytes,
+            rawBytes: result.afterBytes,
+            displayValue: result.instructionText,
+          );
+          savedItemsNotifier.saveOne(
+            pid: selectedPid,
+            result: patchedResult,
+            isFrozen: false,
+            isInstructionPatch: true,
+            instructionText: result.instructionText,
+          );
+          hasPatchedInstruction = true;
+          await browseNotifier.refreshInstructionBrowseWindowIfVisible(
+            sourceResult: patchedResult,
+            instructionText: result.instructionText,
+          );
+        } catch (_) {
+          continue;
+        }
+      }
+      if (hasPatchedInstruction) {
+        ref.invalidate(getMemoryBreakpointStateProvider(pid: selectedPid));
+        ref.invalidate(getMemoryBreakpointsProvider(pid: selectedPid));
+        ref.invalidate(getMemoryBreakpointHitsProvider(pid: selectedPid));
+      }
+    }
+
+    if (selectedPid == null) {
       return Center(
         child: Text(
           context.l10n.selectApp,
@@ -181,41 +426,37 @@ class MemoryToolSavedTab extends HookConsumerWidget {
                 actions: <MemoryToolResultSelectionActionData>[
                   MemoryToolResultSelectionActionData(
                     icon: Icons.done_all_rounded,
-                    onTap: savedItems.isEmpty
-                        ? null
-                        : () {
-                            selectionNotifier.selectVisible(
-                              savedItems.map((item) => item.address),
-                            );
-                          },
+                    onTap: totalSavedEntryCount == 0 ? null : selectAllVisible,
                   ),
                   MemoryToolResultSelectionActionData(
                     icon: Icons.flip_rounded,
-                    onTap: savedItems.isEmpty
-                        ? null
-                        : () {
-                            selectionNotifier.invertVisible(
-                              savedItems.map((item) => item.address),
-                            );
-                          },
+                    onTap: totalSavedEntryCount == 0 ? null : invertAllVisible,
                   ),
                   MemoryToolResultSelectionActionData(
                     icon: Icons.layers_clear_rounded,
-                    onTap: savedItems.isEmpty
-                        ? null
-                        : selectionNotifier.clearSelection,
+                    onTap: totalSelectedCount == 0 ? null : clearAllSelection,
                   ),
                   MemoryToolResultSelectionActionData(
                     icon: Icons.edit_rounded,
-                    onTap: selectedItems.isEmpty
-                        ? null
-                        : () {
+                    onTap:
+                        selectedValueItems.isNotEmpty &&
+                            selectedInstructionItems.isEmpty
+                        ? () {
                             isBatchEditVisible.value = true;
-                          },
+                          }
+                        : selectedInstructionItems.length == 1 &&
+                                selectedValueItems.isEmpty
+                        ? () {
+                            activeInstructionEditor.value =
+                                selectedInstructionItems.single;
+                          }
+                        : null,
                   ),
                   MemoryToolResultSelectionActionData(
                     icon: Icons.calculate_outlined,
-                    onTap: selectedItems.length >= 2
+                    onTap:
+                        selectedValueItems.length >= 2 &&
+                            selectedInstructionItems.isEmpty
                         ? () {
                             isCalculatorVisible.value = true;
                           }
@@ -225,9 +466,18 @@ class MemoryToolSavedTab extends HookConsumerWidget {
                     icon: Icons.undo_rounded,
                     onTap: canRestorePrevious && !valueActionState.isLoading
                         ? () async {
-                            await restoreAddresses(
-                              selectionState.selectedAddresses,
-                            );
+                            if (selectedValueItems.isNotEmpty) {
+                              await restoreAddresses(
+                                selectedValueItems
+                                    .map((item) => item.address)
+                                    .toList(growable: false),
+                              );
+                            }
+                            if (selectedInstructionItems.isNotEmpty) {
+                              await restoreInstructionPatches(
+                                selectedInstructionItems,
+                              );
+                            }
                           }
                         : null,
                   ),
@@ -236,11 +486,24 @@ class MemoryToolSavedTab extends HookConsumerWidget {
                     onTap: selectedItems.isEmpty
                         ? null
                         : () {
-                            savedItemsNotifier.removeSelected(
-                              pid: selectedProcess.pid,
-                              addresses: selectionState.selectedAddresses,
-                            );
-                            selectionNotifier.clearSelection();
+                            if (selectionState.selectedAddresses.isNotEmpty) {
+                              savedItemsNotifier.removeSelected(
+                                pid: selectedPid,
+                                addresses: selectionState.selectedAddresses,
+                              );
+                            }
+                            for (final item in selectedInstructionItems) {
+                              ref
+                                  .read(
+                                    memoryToolInstructionHistoryProvider
+                                        .notifier,
+                                  )
+                                  .remove(
+                                    pid: selectedPid,
+                                    address: item.address,
+                                  );
+                            }
+                            clearAllSelection();
                           },
                   ),
                 ],
@@ -261,26 +524,32 @@ class MemoryToolSavedTab extends HookConsumerWidget {
                       )
                     : ListView.separated(
                         key: PageStorageKey<String>(
-                          'memory_tool_saved_results_${selectedProcess.pid}',
+                          'memory_tool_saved_results_$selectedPid',
                         ),
                         padding: EdgeInsets.zero,
-                        itemCount: savedItems.length,
+                        itemCount: totalListItemCount,
                         separatorBuilder: (_, index) => SizedBox(
-                          height: index == savedItems.length - 1 ? 6.r : 4.r,
+                          height: index == totalListItemCount - 1 ? 6.r : 4.r,
                         ),
                         itemBuilder: (context, index) {
                           final item = savedItems[index];
-                          final preview = previewMap[item.address];
-                          final displayValue =
-                              preview?.displayValue ?? item.displayValue;
+                          final displayValue = resolveSavedItemDisplayValue(
+                            item,
+                          );
                           final isFrozen =
-                              currentFrozenAddresses?.contains(item.address) ??
-                              item.isFrozen;
+                              item.isInstructionPatch
+                              ? false
+                              : (currentFrozenAddresses?.contains(
+                                      item.address,
+                                    ) ??
+                                    item.isFrozen);
                           return MemoryToolSearchResultTile(
-                            result: item.toSearchResult(),
+                            result: resolveSavedItem(item).toSearchResult(),
                             displayValue: displayValue,
-                            previousDisplayValue:
-                                previousValueByAddress[item.address],
+                            previousDisplayValue: item.isInstructionPatch
+                                ? instructionHistoryByAddress[item.address]
+                                    ?.previousDisplayValue
+                                : previousValueByAddress[item.address],
                             isFrozen: isFrozen,
                             isSelected: selectionState.contains(item.address),
                             onToggleSelection: () {
@@ -289,12 +558,27 @@ class MemoryToolSavedTab extends HookConsumerWidget {
                             onDeleteRecord: () {
                               selectionNotifier.removeAddress(item.address);
                               savedItemsNotifier.removeOne(
-                                pid: selectedProcess.pid,
+                                pid: selectedPid,
                                 address: item.address,
                               );
+                              if (item.isInstructionPatch) {
+                                ref
+                                    .read(
+                                      memoryToolInstructionHistoryProvider
+                                          .notifier,
+                                    )
+                                    .remove(
+                                      pid: selectedPid,
+                                      address: item.address,
+                                    );
+                              }
                             },
                             onTap: () {
                               activeActionDialog.value = null;
+                              if (item.isInstructionPatch) {
+                                activeInstructionEditor.value = item;
+                                return;
+                              }
                               activeDialog.value = (
                                 item: item,
                                 displayValue: displayValue,
@@ -313,9 +597,9 @@ class MemoryToolSavedTab extends HookConsumerWidget {
               ),
               SizedBox(height: 6.r),
               MemoryToolResultStatsBar(
-                resultCount: savedItems.length,
-                selectedCount: selectionState.selectedCount,
-                renderedCount: savedItems.length,
+                resultCount: totalSavedEntryCount,
+                selectedCount: totalSelectedCount,
+                renderedCount: totalSavedEntryCount,
                 pageCount: 0,
               ),
             ],
@@ -357,11 +641,19 @@ class MemoryToolSavedTab extends HookConsumerWidget {
                   },
                 ),
                 MemoryToolSearchResultActionItemData(
+                  icon: Icons.bug_report_rounded,
+                  title: context.isZh ? '断点调试' : 'Breakpoint Debug',
+                  onTap: () async {
+                    activeActionDialog.value = null;
+                    activeBreakpointDialog.value = dialog.item;
+                  },
+                ),
+                MemoryToolSearchResultActionItemData(
                   icon: Icons.subdirectory_arrow_right_rounded,
                   title: context.l10n.memoryToolResultActionJumpToPointer,
                   onTap: () async {
                     activeActionDialog.value = null;
-                    await jumpToPointer(dialog.item, dialog.displayValue);
+                    await jumpToPointer(dialog.item);
                   },
                 ),
                 MemoryToolSearchResultActionItemData(
@@ -370,9 +662,10 @@ class MemoryToolSavedTab extends HookConsumerWidget {
                   onTap: () async {
                     await previewAndOpenBrowse(
                       () => browseNotifier.previewFromSearchResult(
-                        result: dialog.item.toSearchResult(),
+                        result: resolveSavedItem(dialog.item).toSearchResult(),
                         preview: previewMap[dialog.item.address],
                         displayValue: dialog.displayValue,
+                        preferInstructionMode: dialog.item.isInstructionPatch,
                       ),
                     );
                     activeActionDialog.value = null;
@@ -414,12 +707,11 @@ class MemoryToolSavedTab extends HookConsumerWidget {
                 MemoryToolSearchResultActionItemData(
                   icon: Icons.data_array_rounded,
                   title:
-                      '${context.l10n.memoryToolResultActionCopyHex}: ${formatMemoryToolSearchResultHex(previewMap[dialog.item.address]?.rawBytes ?? dialog.item.rawBytes)}',
+                      '${context.l10n.memoryToolResultActionCopyHex}: ${formatMemoryToolSearchResultHex(resolveSavedItemRawBytes(dialog.item))}',
                   onTap: () async {
                     await copyText(
                       formatMemoryToolSearchResultHex(
-                        previewMap[dialog.item.address]?.rawBytes ??
-                            dialog.item.rawBytes,
+                        resolveSavedItemRawBytes(dialog.item),
                       ),
                     );
                     activeActionDialog.value = null;
@@ -428,12 +720,11 @@ class MemoryToolSavedTab extends HookConsumerWidget {
                 MemoryToolSearchResultActionItemData(
                   icon: Icons.swap_horiz_rounded,
                   title:
-                      '${context.l10n.memoryToolResultActionCopyReverseHex}: ${formatMemoryToolSearchResultReverseHex(previewMap[dialog.item.address]?.rawBytes ?? dialog.item.rawBytes)}',
+                      '${context.l10n.memoryToolResultActionCopyReverseHex}: ${formatMemoryToolSearchResultReverseHex(resolveSavedItemRawBytes(dialog.item))}',
                   onTap: () async {
                     await copyText(
                       formatMemoryToolSearchResultReverseHex(
-                        previewMap[dialog.item.address]?.rawBytes ??
-                            dialog.item.rawBytes,
+                        resolveSavedItemRawBytes(dialog.item),
                       ),
                     );
                     activeActionDialog.value = null;
@@ -442,6 +733,18 @@ class MemoryToolSavedTab extends HookConsumerWidget {
               ],
               onClose: () {
                 activeActionDialog.value = null;
+              },
+            ),
+          ),
+        if (activeInstructionEditor.value case final patch?)
+          Positioned.fill(
+            child: MemoryToolDebugInstructionEditorDialog(
+              initialValue: patch.effectiveInstructionText,
+              onSave: (value) async {
+                return await saveInstructionPatch(patch, value);
+              },
+              onClose: () {
+                activeInstructionEditor.value = null;
               },
             ),
           ),
@@ -477,19 +780,41 @@ class MemoryToolSavedTab extends HookConsumerWidget {
               },
             ),
           ),
+        if (activeBreakpointDialog.value case final item?)
+          Positioned.fill(
+            child: MemoryToolBreakpointConfigDialog(
+              pid: item.pid,
+              result: resolveSavedItem(item).toSearchResult(),
+              preview: previewMap[item.address],
+              onConfirm: (request) async {
+                final created = await ref
+                    .read(memoryBreakpointActionProvider.notifier)
+                    .addMemoryBreakpoint(request: request);
+                ref
+                    .read(memoryBreakpointSelectedIdProvider.notifier)
+                    .set(created.id);
+                onOpenDebugTab();
+                activeBreakpointDialog.value = null;
+              },
+              onClose: () {
+                activeBreakpointDialog.value = null;
+              },
+            ),
+          ),
         if (activeOffsetPreviewDialog.value case final dialog?)
           Positioned.fill(
             child: MemoryToolOffsetPreviewDialog(
-              result: dialog.item.toSearchResult(),
+              result: resolveSavedItem(dialog.item).toSearchResult(),
               displayValue: dialog.displayValue,
               livePreviewsAsync: livePreviewsAsync,
               onConfirm: (targetAddress) async {
                 activeOffsetPreviewDialog.value = null;
                 await previewAndOpenBrowse(
                   () => browseNotifier.previewFromAddress(
-                    sourceResult: dialog.item.toSearchResult(),
+                    sourceResult: resolveSavedItem(dialog.item).toSearchResult(),
                     sourcePreview: previewMap[dialog.item.address],
                     targetAddress: targetAddress,
+                    preferInstructionMode: dialog.item.isInstructionPatch,
                   ),
                 );
               },
@@ -501,7 +826,7 @@ class MemoryToolSavedTab extends HookConsumerWidget {
         if (activeCopyValueDialog.value case final dialog?)
           Positioned.fill(
             child: MemoryToolCopyValueDialog(
-              result: dialog.item.toSearchResult(),
+              result: resolveSavedItem(dialog.item).toSearchResult(),
               displayValue: dialog.displayValue,
               livePreviewsAsync: livePreviewsAsync,
               onClose: () {
@@ -512,7 +837,7 @@ class MemoryToolSavedTab extends HookConsumerWidget {
         if (isBatchEditVisible.value)
           Positioned.fill(
             child: MemoryToolBatchEditDialog(
-              results: selectedItems
+              results: selectedValueItems
                   .map((item) => item.toSearchResult())
                   .toList(growable: false),
               livePreviewsAsync: livePreviewsAsync,
@@ -525,7 +850,7 @@ class MemoryToolSavedTab extends HookConsumerWidget {
         if (isCalculatorVisible.value)
           Positioned.fill(
             child: MemoryToolResultCalculatorDialog(
-              results: selectedItems
+              results: selectedValueItems
                   .map((item) => item.toSearchResult())
                   .toList(growable: false),
               livePreviewsAsync: livePreviewsAsync,

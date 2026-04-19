@@ -134,7 +134,7 @@ final class MemoryToolSavedItemsProvider
 }
 
 String _$memoryToolSavedItemsHash() =>
-    r'06f61b9a099f760320574014590bdbebb0586583';
+    r'7837bb9300f1c45cf1b78643d0fd40f702ce5ad8';
 
 abstract class _$MemoryToolSavedItems
     extends $Notifier<MemoryToolSavedItemsState> {

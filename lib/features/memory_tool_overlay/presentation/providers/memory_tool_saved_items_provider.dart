@@ -112,6 +112,8 @@ class MemoryToolSavedItems extends _$MemoryToolSavedItems {
     required SearchResult result,
     MemoryValuePreview? preview,
     required bool isFrozen,
+    bool isInstructionPatch = false,
+    String? instructionText,
   }) {
     final nextItemsByPid = _copyItemsByPid();
     final nextItemsByAddress = <int, MemoryToolSavedItem>{
@@ -121,6 +123,8 @@ class MemoryToolSavedItems extends _$MemoryToolSavedItems {
         result: result,
         preview: preview,
         isFrozen: isFrozen,
+        isInstructionPatch: isInstructionPatch,
+        instructionText: instructionText,
       ),
     };
     nextItemsByPid[pid] = nextItemsByAddress;
