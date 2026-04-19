@@ -7,11 +7,13 @@ class MemoryToolInstructionHistoryEntry {
     required this.pid,
     required this.address,
     required this.previousBytes,
+    required this.previousDisplayValue,
   });
 
   final int pid;
   final int address;
   final Uint8List previousBytes;
+  final String previousDisplayValue;
 }
 
 class MemoryToolInstructionHistoryState {
@@ -47,6 +49,7 @@ class MemoryToolInstructionHistory
     required int pid,
     required int address,
     required Uint8List previousBytes,
+    required String previousDisplayValue,
   }) {
     final nextEntriesByPid = _copyEntriesByPid();
     nextEntriesByPid[pid] = <int, MemoryToolInstructionHistoryEntry>{
@@ -56,6 +59,7 @@ class MemoryToolInstructionHistory
         pid: pid,
         address: address,
         previousBytes: Uint8List.fromList(previousBytes),
+        previousDisplayValue: previousDisplayValue,
       ),
     };
     state = state.copyWith(entriesByPid: nextEntriesByPid);

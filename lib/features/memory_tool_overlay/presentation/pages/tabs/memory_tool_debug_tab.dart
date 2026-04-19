@@ -616,6 +616,14 @@ class MemoryToolDebugTab extends HookConsumerWidget {
                 pid: pid,
                 address: address,
                 instructionText: trimmedCurrent,
+                result: SearchResult(
+                  address: address,
+                  regionStart: address,
+                  regionTypeKey: 'other',
+                  type: SearchValueType.bytes,
+                  rawBytes: Uint8List(0),
+                  displayValue: trimmedCurrent,
+                ),
               );
               activeDetailActions.value = null;
               await ToastOverlayMessage.show(
@@ -773,6 +781,7 @@ class MemoryToolDebugTab extends HookConsumerWidget {
           pid: pid,
           address: targetAddress,
           previousBytes: result.beforeBytes,
+          previousDisplayValue: editor.currentValue,
         );
         activeInstructionEditor.value = null;
         final nextPending = <int>{...pendingInstructionAddresses.value};

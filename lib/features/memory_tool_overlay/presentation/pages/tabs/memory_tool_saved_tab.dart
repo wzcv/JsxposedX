@@ -29,7 +29,12 @@ import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memo
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/utils/memory_tool_search_result_presenter.dart';
 import 'package:JsxposedX/features/overlay_window/presentation/providers/overlay_window_host_runtime_provider.dart';
 import 'package:JsxposedX/generated/memory_tool.g.dart'
-    show MemoryValuePreview, PointerScanRequest, SearchResult, SearchValueType, MemoryInstructionPatchRequest;
+    show
+        MemoryValuePreview,
+        PointerScanRequest,
+        SearchResult,
+        SearchValueType,
+        MemoryInstructionPatchRequest;
 import 'package:flutter/material.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -56,12 +61,13 @@ class MemoryToolSavedTab extends HookConsumerWidget {
     final savedItems = ref.watch(savedItemsForSelectedProcessProvider);
     final savedInstructionPatches = ref.watch(
       memoryToolSavedInstructionPatchesProvider.select(
-        (state) => selectedPid == null
-            ? const <MemoryToolSavedInstructionPatch>[]
-            : (state.patchesByPid[selectedPid] ??
-                      const <int, MemoryToolSavedInstructionPatch>{})
-                  .values
-                  .toList(growable: false)
+        (state) =>
+            selectedPid == null
+                  ? const <MemoryToolSavedInstructionPatch>[]
+                  : (state.patchesByPid[selectedPid] ??
+                            const <int, MemoryToolSavedInstructionPatch>{})
+                        .values
+                        .toList(growable: false)
               ..sort((left, right) => left.address.compareTo(right.address)),
       ),
     );
@@ -104,10 +110,9 @@ class MemoryToolSavedTab extends HookConsumerWidget {
     final activeAutoChaseDialog = useState<MemoryToolSavedItem?>(null);
     final activePointerScanDialog = useState<MemoryToolSavedItem?>(null);
     final activeBreakpointDialog = useState<MemoryToolSavedItem?>(null);
-    final activeInstructionActionDialog =
-        useState<MemoryToolSavedInstructionPatch?>(null);
-    final activeInstructionEditor =
-        useState<MemoryToolSavedInstructionPatch?>(null);
+    final activeInstructionEditor = useState<MemoryToolSavedInstructionPatch?>(
+      null,
+    );
     final selectedInstructionAddresses = useState<Set<int>>(<int>{});
 
     useEffect(() {
@@ -142,7 +147,9 @@ class MemoryToolSavedTab extends HookConsumerWidget {
         .where((item) => selectionState.contains(item.address))
         .toList(growable: false);
     final selectedInstructionPatches = savedInstructionPatches
-        .where((item) => selectedInstructionAddresses.value.contains(item.address))
+        .where(
+          (item) => selectedInstructionAddresses.value.contains(item.address),
+        )
         .toList(growable: false);
     final hasInstructionSection = savedInstructionPatches.isNotEmpty;
     final hasValueSection = savedItems.isNotEmpty;
@@ -159,11 +166,11 @@ class MemoryToolSavedTab extends HookConsumerWidget {
     final canRestorePrevious = selectionState.selectedAddresses.any(
       valueHistoryState.containsKey,
     );
-    final canRestorePreviousInstructions = selectedInstructionAddresses.value.any(
-      instructionHistoryByAddress.containsKey,
-    );
+    final canRestorePreviousInstructions = selectedInstructionAddresses.value
+        .any(instructionHistoryByAddress.containsKey);
     final totalSelectedCount =
-        selectionState.selectedCount + selectedInstructionAddresses.value.length;
+        selectionState.selectedCount +
+        selectedInstructionAddresses.value.length;
 
     void clearAllSelection() {
       selectionNotifier.clearSelection();
@@ -285,15 +292,26 @@ class MemoryToolSavedTab extends HookConsumerWidget {
                 instruction: trimmedValue,
               ),
             );
-        ref.read(memoryToolInstructionHistoryProvider.notifier).record(
-          pid: selectedPid,
-          address: patch.address,
-          previousBytes: result.beforeBytes,
-        );
+        ref
+            .read(memoryToolInstructionHistoryProvider.notifier)
+            .record(
+              pid: selectedPid,
+              address: patch.address,
+              previousBytes: result.beforeBytes,
+              previousDisplayValue: patch.instructionText,
+            );
         savedInstructionPatchesNotifier.saveOne(
           pid: selectedPid,
           address: patch.address,
           instructionText: result.instructionText,
+          result: SearchResult(
+            address: patch.address,
+            regionStart: patch.result.regionStart,
+            regionTypeKey: patch.result.regionTypeKey,
+            type: SearchValueType.bytes,
+            rawBytes: result.afterBytes,
+            displayValue: result.instructionText,
+          ),
         );
         activeInstructionEditor.value = null;
         unawaited(
@@ -305,8 +323,9 @@ class MemoryToolSavedTab extends HookConsumerWidget {
         return null;
       } catch (error) {
         final message = error.toString().replaceFirst('Exception: ', '').trim();
-        final resolvedMessage =
-            message.isEmpty ? fallbackErrorMessage : message;
+        final resolvedMessage = message.isEmpty
+            ? fallbackErrorMessage
+            : message;
         unawaited(
           ToastOverlayMessage.show(
             '$failurePrefix: $resolvedMessage',
@@ -323,6 +342,25 @@ class MemoryToolSavedTab extends HookConsumerWidget {
       ].join(' ');
     }
 
+    MemoryToolSavedInstructionPatch? findSavedInstructionPatch(int address) {
+      for (final patch in savedInstructionPatches) {
+        if (patch.address == address) {
+          return patch;
+        }
+      }
+      return null;
+    }
+
+    MemoryToolSavedItem buildSavedItemFromInstructionPatch(
+      MemoryToolSavedInstructionPatch patch,
+    ) {
+      return MemoryToolSavedItem.fromSearchResult(
+        pid: selectedPid!,
+        result: patch.result,
+        isFrozen: false,
+      );
+    }
+
     Future<void> restoreInstructionPatches(List<int> addresses) async {
       if (selectedPid == null) {
         return;
@@ -336,6 +374,7 @@ class MemoryToolSavedTab extends HookConsumerWidget {
       }
 
       for (final entry in historyEntries) {
+        final currentPatch = findSavedInstructionPatch(entry.address);
         try {
           final result = await ref
               .read(memoryValueActionProvider.notifier)
@@ -346,15 +385,27 @@ class MemoryToolSavedTab extends HookConsumerWidget {
                   instruction: encodeInstructionBytesHex(entry.previousBytes),
                 ),
               );
-          ref.read(memoryToolInstructionHistoryProvider.notifier).record(
-            pid: selectedPid,
-            address: entry.address,
-            previousBytes: result.beforeBytes,
-          );
+          ref
+              .read(memoryToolInstructionHistoryProvider.notifier)
+              .record(
+                pid: selectedPid,
+                address: entry.address,
+                previousBytes: result.beforeBytes,
+                previousDisplayValue:
+                    currentPatch?.instructionText ?? result.instructionText,
+              );
           savedInstructionPatchesNotifier.saveOne(
             pid: selectedPid,
             address: entry.address,
             instructionText: result.instructionText,
+            result: SearchResult(
+              address: entry.address,
+              regionStart: currentPatch?.result.regionStart ?? entry.address,
+              regionTypeKey: currentPatch?.result.regionTypeKey ?? 'other',
+              type: SearchValueType.bytes,
+              rawBytes: result.afterBytes,
+              displayValue: result.instructionText,
+            ),
           );
         } catch (_) {
           continue;
@@ -419,7 +470,7 @@ class MemoryToolSavedTab extends HookConsumerWidget {
                     icon: Icons.undo_rounded,
                     onTap:
                         (canRestorePrevious ||
-                            canRestorePreviousInstructions) &&
+                                canRestorePreviousInstructions) &&
                             !valueActionState.isLoading
                         ? () async {
                             if (selectionState.selectedAddresses.isNotEmpty) {
@@ -429,8 +480,9 @@ class MemoryToolSavedTab extends HookConsumerWidget {
                             }
                             if (selectedInstructionAddresses.value.isNotEmpty) {
                               await restoreInstructionPatches(
-                                selectedInstructionAddresses.value
-                                    .toList(growable: false),
+                                selectedInstructionAddresses.value.toList(
+                                  growable: false,
+                                ),
                               );
                             }
                           }
@@ -456,9 +508,13 @@ class MemoryToolSavedTab extends HookConsumerWidget {
                               );
                               ref
                                   .read(
-                                    memoryToolInstructionHistoryProvider.notifier,
+                                    memoryToolInstructionHistoryProvider
+                                        .notifier,
                                   )
-                                  .remove(pid: selectedPid, address: patch.address);
+                                  .remove(
+                                    pid: selectedPid,
+                                    address: patch.address,
+                                  );
                             }
                             clearAllSelection();
                           },
@@ -504,29 +560,50 @@ class MemoryToolSavedTab extends HookConsumerWidget {
                           if (index < cursor + savedInstructionPatches.length) {
                             final patch =
                                 savedInstructionPatches[index - cursor];
-                            return _MemoryToolSavedInstructionPatchTile(
-                              patch: patch,
+                            final item = buildSavedItemFromInstructionPatch(
+                              patch,
+                            );
+                            return MemoryToolSearchResultTile(
+                              result: patch.result,
+                              displayValue: patch.instructionText,
+                              previousDisplayValue:
+                                  instructionHistoryByAddress[patch.address]
+                                      ?.previousDisplayValue,
+                              typeLabelOverride: 'ASM',
+                              regionLabelOverride: 'SAVED',
                               isSelected: selectedInstructionAddresses.value
                                   .contains(patch.address),
                               onToggleSelection: () {
                                 toggleInstructionSelection(patch.address);
                               },
-                              onTap: () {
-                                activeInstructionEditor.value = patch;
-                              },
-                              onLongPress: () {
-                                activeInstructionActionDialog.value = patch;
-                              },
-                              onDelete: () {
+                              onDeleteRecord: () {
                                 savedInstructionPatchesNotifier.removeOne(
                                   pid: selectedPid,
                                   address: patch.address,
                                 );
                                 ref
                                     .read(
-                                      memoryToolInstructionHistoryProvider.notifier,
+                                      memoryToolInstructionHistoryProvider
+                                          .notifier,
                                     )
-                                    .remove(pid: selectedPid, address: patch.address);
+                                    .remove(
+                                      pid: selectedPid,
+                                      address: patch.address,
+                                    );
+                              },
+                              onTap: () {
+                                activeActionDialog.value = null;
+                                activeDialog.value = (
+                                  item: item,
+                                  displayValue: patch.instructionText,
+                                );
+                              },
+                              onLongProcess: () {
+                                activeDialog.value = null;
+                                activeActionDialog.value = (
+                                  item: item,
+                                  displayValue: patch.instructionText,
+                                );
                               },
                             );
                           }
@@ -725,72 +802,6 @@ class MemoryToolSavedTab extends HookConsumerWidget {
               },
             ),
           ),
-        if (activeInstructionActionDialog.value case final patch?)
-          Positioned.fill(
-            child: MemoryToolSearchResultActionDialog(
-              actions: <MemoryToolSearchResultActionItemData>[
-                MemoryToolSearchResultActionItemData(
-                  icon: Icons.copy_all_rounded,
-                  title:
-                      '${context.isZh ? '复制指令' : 'Copy Instruction'}: ${patch.instructionText}',
-                  onTap: () async {
-                    await copyText(patch.instructionText);
-                    activeInstructionActionDialog.value = null;
-                  },
-                ),
-                MemoryToolSearchResultActionItemData(
-                  icon: Icons.pin_drop_rounded,
-                  title:
-                      '${context.isZh ? '复制地址' : 'Copy Address'}: ${formatMemoryToolSearchResultAddress(patch.address)}',
-                  onTap: () async {
-                    await copyText(
-                      formatMemoryToolSearchResultAddress(patch.address),
-                    );
-                    activeInstructionActionDialog.value = null;
-                  },
-                ),
-                MemoryToolSearchResultActionItemData(
-                  icon: Icons.preview_rounded,
-                  title: context.isZh ? '浏览地址' : 'Browse Address',
-                  onTap: () async {
-                    activeInstructionActionDialog.value = null;
-                    await previewAndOpenBrowse(
-                      () => browseNotifier.previewRawAddress(
-                        targetAddress: patch.address,
-                        type: SearchValueType.bytes,
-                        bytesLength: 4,
-                      ),
-                    );
-                  },
-                ),
-                MemoryToolSearchResultActionItemData(
-                  icon: Icons.bug_report_rounded,
-                  title: context.isZh ? '切到断点调试' : 'Open Debug Tab',
-                  onTap: () async {
-                    activeInstructionActionDialog.value = null;
-                    onOpenDebugTab();
-                  },
-                ),
-                MemoryToolSearchResultActionItemData(
-                  icon: Icons.delete_outline_rounded,
-                  title: context.isZh ? '从暂存区移除' : 'Remove from Saved',
-                  onTap: () async {
-                    savedInstructionPatchesNotifier.removeOne(
-                      pid: selectedPid,
-                      address: patch.address,
-                    );
-                    ref
-                        .read(memoryToolInstructionHistoryProvider.notifier)
-                        .remove(pid: selectedPid, address: patch.address);
-                    activeInstructionActionDialog.value = null;
-                  },
-                ),
-              ],
-              onClose: () {
-                activeInstructionActionDialog.value = null;
-              },
-            ),
-          ),
         if (activeInstructionEditor.value case final patch?)
           Positioned.fill(
             child: MemoryToolDebugInstructionEditorDialog(
@@ -950,108 +961,6 @@ class _MemoryToolSavedSectionHeader extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _MemoryToolSavedInstructionPatchTile extends StatelessWidget {
-  const _MemoryToolSavedInstructionPatchTile({
-    required this.patch,
-    required this.isSelected,
-    required this.onToggleSelection,
-    required this.onTap,
-    required this.onLongPress,
-    required this.onDelete,
-  });
-
-  final MemoryToolSavedInstructionPatch patch;
-  final bool isSelected;
-  final VoidCallback onToggleSelection;
-  final VoidCallback onTap;
-  final VoidCallback onLongPress;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14.r),
-        onTap: onTap,
-        onLongPress: onLongPress,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: EdgeInsets.all(12.r),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? context.colorScheme.primaryContainer.withValues(alpha: 0.72)
-                : context.colorScheme.surface.withValues(alpha: 0.86),
-            borderRadius: BorderRadius.circular(14.r),
-            border: Border.all(
-              color: isSelected
-                  ? context.colorScheme.primary
-                  : context.colorScheme.outlineVariant.withValues(alpha: 0.4),
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Transform.scale(
-                scale: 0.9,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(10.r),
-                  onTap: onToggleSelection,
-                  child: Padding(
-                    padding: EdgeInsets.all(2.r),
-                    child: Icon(
-                      isSelected
-                          ? Icons.check_box_rounded
-                          : Icons.check_box_outline_blank_rounded,
-                      size: 22.r,
-                      color: isSelected
-                          ? context.colorScheme.primary
-                          : context.colorScheme.onSurfaceVariant.withValues(
-                              alpha: 0.72,
-                            ),
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(width: 4.r),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      patch.instructionText,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    SizedBox(height: 4.r),
-                    Text(
-                      formatMemoryToolSearchResultAddress(patch.address),
-                      style: context.textTheme.bodySmall?.copyWith(
-                        color: context.colorScheme.onSurfaceVariant,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(width: 8.r),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                onPressed: onDelete,
-                icon: const Icon(Icons.close_rounded),
-                color: context.colorScheme.onSurfaceVariant,
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

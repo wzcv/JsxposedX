@@ -1,13 +1,18 @@
+import 'dart:typed_data';
+
+import 'package:JsxposedX/generated/memory_tool.g.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class MemoryToolSavedInstructionPatch {
   const MemoryToolSavedInstructionPatch({
     required this.address,
     required this.instructionText,
+    required this.result,
   });
 
   final int address;
   final String instructionText;
+  final SearchResult result;
 }
 
 class MemoryToolSavedInstructionPatchesState {
@@ -43,7 +48,18 @@ class MemoryToolSavedInstructionPatches
     required int pid,
     required int address,
     required String instructionText,
+    SearchResult? result,
   }) {
+    final normalizedResult =
+        result ??
+        SearchResult(
+          address: address,
+          regionStart: address,
+          regionTypeKey: 'other',
+          type: SearchValueType.bytes,
+          rawBytes: Uint8List(0),
+          displayValue: instructionText,
+        );
     final nextPatchesByPid = _copyPatchesByPid();
     nextPatchesByPid[pid] = <int, MemoryToolSavedInstructionPatch>{
       ...(nextPatchesByPid[pid] ??
@@ -51,6 +67,7 @@ class MemoryToolSavedInstructionPatches
       address: MemoryToolSavedInstructionPatch(
         address: address,
         instructionText: instructionText,
+        result: normalizedResult,
       ),
     };
     state = state.copyWith(patchesByPid: nextPatchesByPid);

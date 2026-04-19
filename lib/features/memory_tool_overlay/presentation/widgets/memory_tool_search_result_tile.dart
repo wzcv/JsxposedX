@@ -11,6 +11,8 @@ class MemoryToolSearchResultTile extends StatelessWidget {
     required this.result,
     required this.displayValue,
     this.previousDisplayValue,
+    this.typeLabelOverride,
+    this.regionLabelOverride,
     this.isFrozen = false,
     this.isAnchor = false,
     required this.isSelected,
@@ -23,6 +25,8 @@ class MemoryToolSearchResultTile extends StatelessWidget {
   final SearchResult result;
   final String displayValue;
   final String? previousDisplayValue;
+  final String? typeLabelOverride;
+  final String? regionLabelOverride;
   final bool isFrozen;
   final bool isAnchor;
   final bool isSelected;
@@ -131,10 +135,12 @@ class MemoryToolSearchResultTile extends StatelessWidget {
                                 runSpacing: 6.r,
                                 children: <Widget>[
                                   MemoryToolResultBadge(
-                                    label: mapMemoryToolSearchResultTypeLabel(
-                                      type: result.type,
-                                      displayValue: displayValue,
-                                    ),
+                                    label:
+                                        typeLabelOverride ??
+                                        mapMemoryToolSearchResultTypeLabel(
+                                          type: result.type,
+                                          displayValue: displayValue,
+                                        ),
                                     backgroundColor:
                                         mapMemoryToolSearchResultTypeBadgeBackground(
                                           result.type,
@@ -181,6 +187,7 @@ class MemoryToolSearchResultTile extends StatelessWidget {
                                 alignment: Alignment.centerRight,
                                 child: MemoryToolResultBadge(
                                   label:
+                                      regionLabelOverride ??
                                       mapMemoryToolSearchResultRegionTypeLabel(
                                         context,
                                         result.regionTypeKey,
