@@ -77,6 +77,8 @@ public:
                                               jlong address,
                                               jstring input_text);
 
+    static jstring DisassembleMemoryJson(JNIEnv* env, jlong pid, jlongArray addresses);
+
     static jstring ReadMemoryValuesJson(JNIEnv* env,
                                         jlongArray pids,
                                         jlongArray addresses,

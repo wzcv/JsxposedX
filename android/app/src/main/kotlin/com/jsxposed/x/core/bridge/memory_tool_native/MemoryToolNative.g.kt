@@ -1360,6 +1360,46 @@ data class MemoryInstructionPatchResult (
 
   override fun hashCode(): Int = toList().hashCode()
 }
+
+/** Generated class from Pigeon that represents data sent in messages. */
+data class MemoryInstructionPreview (
+  val address: Long,
+  val architecture: String,
+  val instructionSize: Long,
+  val rawBytes: ByteArray,
+  val instructionText: String
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): MemoryInstructionPreview {
+      val address = pigeonVar_list[0] as Long
+      val architecture = pigeonVar_list[1] as String
+      val instructionSize = pigeonVar_list[2] as Long
+      val rawBytes = pigeonVar_list[3] as ByteArray
+      val instructionText = pigeonVar_list[4] as String
+      return MemoryInstructionPreview(address, architecture, instructionSize, rawBytes, instructionText)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      address,
+      architecture,
+      instructionSize,
+      rawBytes,
+      instructionText,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other !is MemoryInstructionPreview) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    return MemoryToolNativePigeonUtils.deepEquals(toList(), other.toList())  }
+
+  override fun hashCode(): Int = toList().hashCode()
+}
 private open class MemoryToolNativePigeonCodec : StandardMessageCodec() {
   override fun readValueOfType(type: Byte, buffer: ByteBuffer): Any? {
     return when (type) {
@@ -1523,6 +1563,11 @@ private open class MemoryToolNativePigeonCodec : StandardMessageCodec() {
           MemoryInstructionPatchResult.fromList(it)
         }
       }
+      161.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          MemoryInstructionPreview.fromList(it)
+        }
+      }
       else -> super.readValueOfType(type, buffer)
     }
   }
@@ -1656,6 +1701,10 @@ private open class MemoryToolNativePigeonCodec : StandardMessageCodec() {
         stream.write(160)
         writeValue(stream, value.toList())
       }
+      is MemoryInstructionPreview -> {
+        stream.write(161)
+        writeValue(stream, value.toList())
+      }
       else -> super.writeValue(stream, value)
     }
   }
@@ -1687,6 +1736,7 @@ interface MemoryToolNative {
   fun readMemoryValues(requests: List<MemoryReadRequest>, callback: (Result<List<MemoryValuePreview>>) -> Unit)
   fun writeMemoryValue(request: MemoryWriteRequest, callback: (Result<Unit>) -> Unit)
   fun patchMemoryInstruction(request: MemoryInstructionPatchRequest, callback: (Result<MemoryInstructionPatchResult>) -> Unit)
+  fun disassembleMemory(pid: Long, addresses: List<Long>, callback: (Result<List<MemoryInstructionPreview>>) -> Unit)
   fun setMemoryFreeze(request: MemoryFreezeRequest, callback: (Result<Unit>) -> Unit)
   fun getFrozenMemoryValues(callback: (Result<List<FrozenMemoryValue>>) -> Unit)
   fun isProcessPaused(pid: Long, callback: (Result<Boolean>) -> Unit)
@@ -2149,6 +2199,27 @@ interface MemoryToolNative {
             val args = message as List<Any?>
             val requestArg = args[0] as MemoryInstructionPatchRequest
             api.patchMemoryInstruction(requestArg) { result: Result<MemoryInstructionPatchResult> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(MemoryToolNativePigeonUtils.wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(MemoryToolNativePigeonUtils.wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.JsxposedX.MemoryToolNative.disassembleMemory$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val pidArg = args[0] as Long
+            val addressesArg = args[1] as List<Long>
+            api.disassembleMemory(pidArg, addressesArg) { result: Result<List<MemoryInstructionPreview>> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(MemoryToolNativePigeonUtils.wrapError(error))

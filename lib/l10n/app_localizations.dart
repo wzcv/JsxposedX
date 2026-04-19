@@ -4805,6 +4805,24 @@ abstract class AppLocalizations {
   /// **'异或'**
   String get memoryToolResultCalculatorXor;
 
+  /// No description provided for @memoryToolAssemblyPreviewTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'汇编预览'**
+  String get memoryToolAssemblyPreviewTitle;
+
+  /// No description provided for @memoryToolAssemblyPreviewCount.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 个地址'**
+  String memoryToolAssemblyPreviewCount(int count);
+
+  /// No description provided for @memoryToolAssemblyPreviewEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'没有可渲染的汇编'**
+  String get memoryToolAssemblyPreviewEmpty;
+
   /// No description provided for @memoryToolResultSelectionDialogTitle.
   ///
   /// In zh, this message translates to:

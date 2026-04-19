@@ -1117,6 +1117,16 @@
   "memoryToolResultCalculatorCombinations": "Combinations",
   "memoryToolResultCalculatorOffset": "Offset",
   "memoryToolResultCalculatorXor": "XOR",
+  "memoryToolAssemblyPreviewTitle": "Assembly Preview",
+  "memoryToolAssemblyPreviewCount": "{count} addresses",
+  "@memoryToolAssemblyPreviewCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "memoryToolAssemblyPreviewEmpty": "No assembly can be rendered.",
   "memoryToolResultSelectionDialogTitle": "Result List Settings",
   "memoryToolResultSelectionSearchDescription": "Controls how many search results are rendered now and also caps multi-select, save, and batch actions.",
   "memoryToolResultSelectionBrowseDescription": "Controls browse-page selection capacity and page stats without clearing already loaded memory results.",

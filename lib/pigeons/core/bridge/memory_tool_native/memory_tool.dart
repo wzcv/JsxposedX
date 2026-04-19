@@ -524,6 +524,22 @@ class MemoryInstructionPatchResult {
   });
 }
 
+class MemoryInstructionPreview {
+  final int address;
+  final String architecture;
+  final int instructionSize;
+  final Uint8List rawBytes;
+  final String instructionText;
+
+  const MemoryInstructionPreview({
+    required this.address,
+    required this.architecture,
+    required this.instructionSize,
+    required this.rawBytes,
+    required this.instructionText,
+  });
+}
+
 @HostApi()
 abstract class MemoryToolNative {
   @async
@@ -604,6 +620,9 @@ abstract class MemoryToolNative {
   MemoryInstructionPatchResult patchMemoryInstruction(
     MemoryInstructionPatchRequest request,
   );
+
+  @async
+  List<MemoryInstructionPreview> disassembleMemory(int pid, List<int> addresses);
 
   @async
   void setMemoryFreeze(MemoryFreezeRequest request);

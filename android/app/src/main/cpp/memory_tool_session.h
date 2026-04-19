@@ -250,6 +250,14 @@ struct InstructionPatchResultView {
     std::string instruction_text;
 };
 
+struct MemoryInstructionView {
+    uint64_t address = 0;
+    std::string architecture;
+    size_t instruction_size = 0;
+    std::vector<uint8_t> raw_bytes;
+    std::string instruction_text;
+};
+
 struct PointerAutoChaseLayerStateView {
     size_t layer_index = 0;
     uint64_t target_address = 0;

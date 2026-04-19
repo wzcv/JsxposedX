@@ -67,6 +67,17 @@ class MemoryQueryRepositoryImpl implements MemoryQueryRepository {
   }
 
   @override
+  Future<List<MemoryInstructionPreview>> disassembleMemory({
+    required int pid,
+    required List<int> addresses,
+  }) async {
+    return await dataSource.disassembleMemory(
+      pid: pid,
+      addresses: addresses,
+    );
+  }
+
+  @override
   Future<List<MemoryBreakpoint>> listMemoryBreakpoints({required int pid}) async {
     return await dataSource.listMemoryBreakpoints(pid: pid);
   }

@@ -224,6 +224,32 @@ jstring MemoryToolJniBridge::PatchMemoryInstructionJson(JNIEnv* env,
     return env->NewStringUTF(protocol::SerializeInstructionPatchResult(result).c_str());
 }
 
+jstring MemoryToolJniBridge::DisassembleMemoryJson(JNIEnv* env,
+                                                   jlong pid,
+                                                   jlongArray addresses) {
+    if (addresses == nullptr) {
+        return env->NewStringUTF("[]");
+    }
+
+    const jsize address_count = env->GetArrayLength(addresses);
+    std::vector<jlong> address_values(static_cast<size_t>(address_count));
+    env->GetLongArrayRegion(addresses, 0, address_count, address_values.data());
+
+    std::vector<uint64_t> request_addresses;
+    request_addresses.reserve(static_cast<size_t>(address_count));
+    for (jlong value : address_values) {
+        if (value <= 0) {
+            continue;
+        }
+        request_addresses.push_back(static_cast<uint64_t>(value));
+    }
+
+    const auto instructions = MemoryToolEngine::Instance().DisassembleMemory(
+        static_cast<int>(pid),
+        request_addresses);
+    return env->NewStringUTF(protocol::SerializeMemoryInstructions(instructions).c_str());
+}
+
 jstring MemoryToolJniBridge::ReadMemoryValuesJson(JNIEnv* env,
                                                   jlongArray pids,
                                                   jlongArray addresses,
@@ -747,6 +773,20 @@ Java_com_jsxposed_x_core_bridge_memory_1tool_1native_MemoryToolHelperNativeBridg
             pid,
             address,
             input_text);
+    } catch (const std::exception& exception) {
+        memory_tool::ThrowRuntimeException(env, exception.what());
+        return nullptr;
+    }
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_jsxposed_x_core_bridge_memory_1tool_1native_MemoryToolHelperNativeBridge_disassembleMemoryJson(
+        JNIEnv* env,
+        jobject /* thiz */,
+        jlong pid,
+        jlongArray addresses) {
+    try {
+        return memory_tool::MemoryToolJniBridge::DisassembleMemoryJson(env, pid, addresses);
     } catch (const std::exception& exception) {
         memory_tool::ThrowRuntimeException(env, exception.what());
         return nullptr;

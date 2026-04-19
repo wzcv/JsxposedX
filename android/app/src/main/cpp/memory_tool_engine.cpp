@@ -966,6 +966,49 @@ InstructionPatchResultView MemoryToolEngine::PatchMemoryInstruction(
     return PatchMemoryInstructionAtAddress(pid, address, input_text);
 }
 
+std::vector<MemoryInstructionView> MemoryToolEngine::DisassembleMemory(
+    int pid,
+    const std::vector<uint64_t>& addresses) {
+    if (pid <= 0) {
+        throw std::runtime_error("Invalid process id.");
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!IsProcessAlive(pid)) {
+            if (session_.pid == pid) {
+                session_.Clear();
+            }
+            if (pointer_session_.pid == pid) {
+                pointer_session_.Clear();
+            }
+            throw std::runtime_error("Target process is no longer available.");
+        }
+    }
+
+    std::vector<MemoryInstructionView> instructions;
+    instructions.reserve(addresses.size());
+    for (uint64_t address : addresses) {
+        if (address == 0) {
+            continue;
+        }
+
+        const MemoryInstructionInfo info = ReadMemoryInstruction(pid, address);
+        if (!info.is_valid || info.raw_bytes.empty()) {
+            continue;
+        }
+
+        MemoryInstructionView instruction;
+        instruction.address = address;
+        instruction.architecture = info.architecture;
+        instruction.instruction_size = info.size;
+        instruction.raw_bytes = info.raw_bytes;
+        instruction.instruction_text = info.text;
+        instructions.push_back(std::move(instruction));
+    }
+    return instructions;
+}
+
 std::vector<MemoryValuePreview> MemoryToolEngine::ReadMemoryValues(
     const std::vector<MemoryReadRequest>& requests) {
     std::lock_guard<std::mutex> lock(mutex_);

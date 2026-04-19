@@ -192,6 +192,13 @@ private class MemoryToolDaemonServer(
                 )
             )
 
+            "disassembleMemory" -> JSONArray(
+                MemoryToolHelperNativeBridge.disassembleMemoryJson(
+                    pid = params.getLong("pid"),
+                    addresses = extractLongArray(params.getJSONArray("addresses"))
+                )
+            )
+
             "readMemoryValues" -> JSONArray(
                 MemoryToolHelperNativeBridge.readMemoryValuesJson(
                     pids = extractLongArray(params.getJSONArray("requests"), "pid"),
@@ -326,6 +333,12 @@ private class MemoryToolDaemonServer(
     private fun extractLongArray(items: JSONArray, fieldName: String): LongArray {
         return LongArray(items.length()) { index ->
             items.getJSONObject(index).getLong(fieldName)
+        }
+    }
+
+    private fun extractLongArray(items: JSONArray): LongArray {
+        return LongArray(items.length()) { index ->
+            items.getLong(index)
         }
     }
 

@@ -1950,6 +1950,67 @@ class MemoryInstructionPatchResult {
 ;
 }
 
+class MemoryInstructionPreview {
+  MemoryInstructionPreview({
+    required this.address,
+    required this.architecture,
+    required this.instructionSize,
+    required this.rawBytes,
+    required this.instructionText,
+  });
+
+  int address;
+
+  String architecture;
+
+  int instructionSize;
+
+  Uint8List rawBytes;
+
+  String instructionText;
+
+  List<Object?> _toList() {
+    return <Object?>[
+      address,
+      architecture,
+      instructionSize,
+      rawBytes,
+      instructionText,
+    ];
+  }
+
+  Object encode() {
+    return _toList();  }
+
+  static MemoryInstructionPreview decode(Object result) {
+    result as List<Object?>;
+    return MemoryInstructionPreview(
+      address: result[0]! as int,
+      architecture: result[1]! as String,
+      instructionSize: result[2]! as int,
+      rawBytes: result[3]! as Uint8List,
+      instructionText: result[4]! as String,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! MemoryInstructionPreview || other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(encode(), other.encode());
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => Object.hashAll(_toList())
+;
+}
+
 
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
@@ -2054,6 +2115,9 @@ class _PigeonCodec extends StandardMessageCodec {
     }    else if (value is MemoryInstructionPatchResult) {
       buffer.putUint8(160);
       writeValue(buffer, value.encode());
+    }    else if (value is MemoryInstructionPreview) {
+      buffer.putUint8(161);
+      writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
     }
@@ -2126,10 +2190,12 @@ class _PigeonCodec extends StandardMessageCodec {
         return PointerScanSessionState.decode(readValue(buffer)!);
       case 158: 
         return PointerScanTaskState.decode(readValue(buffer)!);
-      case 159:
+      case 159: 
         return MemoryInstructionPatchRequest.decode(readValue(buffer)!);
-      case 160:
+      case 160: 
         return MemoryInstructionPatchResult.decode(readValue(buffer)!);
+      case 161: 
+        return MemoryInstructionPreview.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
     }
@@ -2765,6 +2831,34 @@ class MemoryToolNative {
       );
     } else {
       return (pigeonVar_replyList[0] as MemoryInstructionPatchResult?)!;
+    }
+  }
+
+  Future<List<MemoryInstructionPreview>> disassembleMemory(int pid, List<int> addresses) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.JsxposedX.MemoryToolNative.disassembleMemory$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[pid, addresses]);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as List<Object?>?)!.cast<MemoryInstructionPreview>();
     }
   }
 

@@ -1,7 +1,6 @@
 #include "memory_tool_breakpoint.h"
 
 #include <android/log.h>
-#include <capstone/capstone.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -27,6 +26,7 @@
 #include <unordered_map>
 #include <utility>
 
+#include "memory_tool_instruction.h"
 #include "memory_tool_reader.h"
 #include "memory_tool_regions.h"
 #include "memory_tool_utils.h"
@@ -314,73 +314,15 @@ ModuleLocation ResolveModuleLocation(int pid, uint64_t address) {
     return location;
 }
 
-std::string HexFallback(const std::vector<uint8_t>& bytes) {
-    const std::string encoded = utils::HexEncode(bytes);
-    if (encoded.empty()) {
-        return {};
-    }
-    return encoded;
-}
-
 std::string DisassembleInstruction(int pid, uint64_t pc) {
     if (pc == 0) {
         return {};
     }
-
-    ProcessMemoryReader reader(pid);
-    std::vector<uint8_t> bytes;
-    size_t read_size = 0;
-    cs_arch arch;
-    cs_mode mode;
-
-#if defined(__aarch64__)
-    read_size = 4;
-    arch = CS_ARCH_ARM64;
-    mode = CS_MODE_LITTLE_ENDIAN;
-#elif defined(__arm__)
-    read_size = 4;
-    arch = CS_ARCH_ARM;
-    mode = static_cast<cs_mode>(CS_MODE_ARM | CS_MODE_LITTLE_ENDIAN);
-#elif defined(__x86_64__)
-    read_size = 16;
-    arch = CS_ARCH_X86;
-    mode = CS_MODE_64;
-#elif defined(__i386__)
-    read_size = 16;
-    arch = CS_ARCH_X86;
-    mode = CS_MODE_32;
-#else
-    (void)reader;
-    return {};
-#endif
-
-    if (!reader.Read(pc, read_size, &bytes)) {
-        return {};
+    const MemoryInstructionInfo instruction = ReadMemoryInstruction(pid, pc);
+    if (!instruction.text.empty()) {
+        return instruction.text;
     }
-
-    csh handle = 0;
-    if (cs_open(arch, mode, &handle) != CS_ERR_OK) {
-        return HexFallback(bytes);
-    }
-    cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF);
-
-    cs_insn* instruction = nullptr;
-    const size_t count = cs_disasm(handle, bytes.data(), bytes.size(), pc, 1, &instruction);
-    std::string text;
-    if (count > 0 && instruction != nullptr) {
-        text = instruction[0].mnemonic;
-        if (instruction[0].op_str[0] != '\0') {
-            text += ' ';
-            text += instruction[0].op_str;
-        }
-    } else {
-        text = HexFallback(bytes);
-    }
-    if (instruction != nullptr) {
-        cs_free(instruction, count);
-    }
-    cs_close(&handle);
-    return text;
+    return utils::HexEncode(instruction.raw_bytes);
 }
 
 }  // namespace

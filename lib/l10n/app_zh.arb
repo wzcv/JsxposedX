@@ -1122,6 +1122,16 @@
   "memoryToolResultCalculatorCombinations": "组合",
   "memoryToolResultCalculatorOffset": "偏移",
   "memoryToolResultCalculatorXor": "异或",
+  "memoryToolAssemblyPreviewTitle": "汇编预览",
+  "memoryToolAssemblyPreviewCount": "{count} 个地址",
+  "@memoryToolAssemblyPreviewCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "memoryToolAssemblyPreviewEmpty": "没有可渲染的汇编",
   "memoryToolResultSelectionDialogTitle": "结果列表设置",
   "memoryToolResultSelectionSearchDescription": "控制搜索页当前渲染数量，同时也是多选、保存、批量修改等操作的上限。",
   "memoryToolResultSelectionBrowseDescription": "控制浏览页单次可选数量和分页统计，不会清空已经加载的内存结果。",

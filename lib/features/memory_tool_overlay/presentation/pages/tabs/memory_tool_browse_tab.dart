@@ -7,6 +7,7 @@ import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/me
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_pointer_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_saved_items_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/utils/memory_tool_pointer_utils.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_assembly_preview_dialog.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_browse_result_list.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_batch_edit_dialog.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_result_calculator_dialog.dart';
@@ -52,6 +53,7 @@ class MemoryToolBrowseTab extends HookConsumerWidget {
     final isSettingsVisible = useState(false);
     final isBatchEditVisible = useState(false);
     final isCalculatorVisible = useState(false);
+    final assemblyPreviewAddresses = useState<List<int>?>(null);
     final scrollController = useMemoized(() => ScrollController(), [
       browseState.focusRequestId,
     ]);
@@ -357,6 +359,16 @@ class MemoryToolBrowseTab extends HookConsumerWidget {
                         : null,
                   ),
                   MemoryToolResultSelectionActionData(
+                    icon: Icons.code_rounded,
+                    onTap: selectedResults.isEmpty
+                        ? null
+                        : () {
+                            assemblyPreviewAddresses.value = selectedResults
+                                .map((result) => result.address)
+                                .toList(growable: false);
+                          },
+                  ),
+                  MemoryToolResultSelectionActionData(
                     icon: Icons.edit_rounded,
                     onTap: selectedResults.isEmpty
                         ? null
@@ -482,6 +494,16 @@ class MemoryToolBrowseTab extends HookConsumerWidget {
               livePreviewsAsync: resolvedLivePreviewsAsync,
               onClose: () {
                 isCalculatorVisible.value = false;
+              },
+            ),
+          ),
+        if (assemblyPreviewAddresses.value != null)
+          Positioned.fill(
+            child: MemoryToolAssemblyPreviewDialog(
+              pid: selectedProcess.pid,
+              addresses: assemblyPreviewAddresses.value!,
+              onClose: () {
+                assemblyPreviewAddresses.value = null;
               },
             ),
           ),

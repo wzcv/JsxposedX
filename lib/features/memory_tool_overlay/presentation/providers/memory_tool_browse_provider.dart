@@ -17,9 +17,14 @@ const int _memoryToolBrowseRegionPageSize = 200;
 
 @riverpod
 List<SearchResult> currentBrowseResults(Ref ref) {
-  final browseState = ref.watch(memoryToolBrowseControllerProvider);
-  return browseState.results
-      .where((result) => !browseState.hiddenAddresses.contains(result.address))
+  final results = ref.watch(
+    memoryToolBrowseControllerProvider.select((state) => state.results),
+  );
+  final hiddenAddresses = ref.watch(
+    memoryToolBrowseControllerProvider.select((state) => state.hiddenAddresses),
+  );
+  return results
+      .where((result) => !hiddenAddresses.contains(result.address))
       .toList(growable: false);
 }
 
@@ -27,8 +32,10 @@ List<SearchResult> currentBrowseResults(Ref ref) {
 Future<Map<int, MemoryValuePreview>> currentBrowseResultLivePreviews(
   Ref ref,
 ) async {
-  final browseState = ref.watch(memoryToolBrowseControllerProvider);
   final visibleResults = ref.watch(currentBrowseResultsProvider);
+  final anchorAddress = ref.watch(
+    memoryToolBrowseControllerProvider.select((state) => state.anchorAddress),
+  );
   final selectedProcess = ref.watch(memoryToolSelectedProcessProvider);
   final isPanelVisible = ref.watch(
     overlayWindowHostRuntimeProvider.select(
@@ -37,7 +44,7 @@ Future<Map<int, MemoryValuePreview>> currentBrowseResultLivePreviews(
   );
 
   if (!isPanelVisible ||
-      !browseState.hasAnchor ||
+      anchorAddress == null ||
       visibleResults.isEmpty ||
       selectedProcess == null) {
     return const <int, MemoryValuePreview>{};

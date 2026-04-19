@@ -29,6 +29,7 @@ class MemoryToolDaemonClient(
         private const val METHOD_CLEAR_MEMORY_BREAKPOINT_HITS = "clearMemoryBreakpointHits"
         private const val METHOD_RESUME_AFTER_BREAKPOINT = "resumeAfterBreakpoint"
         private const val METHOD_PATCH_MEMORY_INSTRUCTION = "patchMemoryInstruction"
+        private const val METHOD_DISASSEMBLE_MEMORY = "disassembleMemory"
         private const val METHOD_READ_MEMORY_VALUES = "readMemoryValues"
         private const val METHOD_WRITE_MEMORY_VALUE = "writeMemoryValue"
         private const val METHOD_SET_MEMORY_FREEZE = "setMemoryFreeze"
@@ -525,6 +526,37 @@ class MemoryToolDaemonClient(
             afterBytes = decodeHex(item.optString("afterBytesHex")),
             instructionText = item.optString("instructionText")
         )
+    }
+
+    fun disassembleMemory(pid: Int, addresses: List<Long>): List<MemoryInstructionPreview> {
+        if (addresses.isEmpty()) {
+            return emptyList()
+        }
+
+        helperManager.ensureDaemon()
+        val result = sendOrThrow(
+            METHOD_DISASSEMBLE_MEMORY,
+            JSONObject().apply {
+                put("pid", pid)
+                put(
+                    "addresses",
+                    JSONArray().apply {
+                        addresses.forEach(::put)
+                    }
+                )
+            }
+        ).optJSONArray("result") ?: JSONArray()
+
+        return List(result.length()) { index ->
+            val item = result.getJSONObject(index)
+            MemoryInstructionPreview(
+                address = item.getLong("address"),
+                architecture = item.optString("architecture"),
+                instructionSize = item.optLong("instructionSize"),
+                rawBytes = decodeHex(item.optString("rawBytesHex")),
+                instructionText = item.optString("instructionText")
+            )
+        }
     }
 
     fun readMemoryValues(requests: List<MemoryReadRequest>): List<MemoryValuePreview> {

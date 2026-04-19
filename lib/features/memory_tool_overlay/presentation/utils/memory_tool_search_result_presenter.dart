@@ -10,10 +10,12 @@ String resolveMemoryToolSearchResultDisplayValue({
   required SearchResult result,
   required AsyncValue<Map<int, MemoryValuePreview>> livePreviewsAsync,
 }) {
+  final fallbackDisplayValue = result.displayValue;
   return livePreviewsAsync.when(
-    data: (previews) => previews[result.address]?.displayValue ?? '--',
-    error: (_, _) => '--',
-    loading: () => '...',
+    data: (previews) =>
+        previews[result.address]?.displayValue ?? fallbackDisplayValue,
+    error: (_, _) => fallbackDisplayValue,
+    loading: () => fallbackDisplayValue,
   );
 }
 

@@ -20,6 +20,10 @@ struct MemoryInstructionInfo {
 
 MemoryInstructionInfo ReadMemoryInstruction(int pid, uint64_t address);
 
+std::vector<MemoryInstructionInfo> ReadMemoryInstructions(
+    int pid,
+    const std::vector<uint64_t>& addresses);
+
 InstructionPatchResultView PatchMemoryInstructionAtAddress(int pid,
                                                            uint64_t address,
                                                            const std::string& input_text);

@@ -2433,6 +2433,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get memoryToolResultCalculatorXor => '异或';
 
   @override
+  String get memoryToolAssemblyPreviewTitle => '汇编预览';
+
+  @override
+  String memoryToolAssemblyPreviewCount(int count) {
+    return '$count 个地址';
+  }
+
+  @override
+  String get memoryToolAssemblyPreviewEmpty => '没有可渲染的汇编';
+
+  @override
   String get memoryToolResultSelectionDialogTitle => '结果列表设置';
 
   @override

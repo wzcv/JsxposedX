@@ -55,7 +55,7 @@ final class CurrentBrowseResultsProvider
 }
 
 String _$currentBrowseResultsHash() =>
-    r'77a5461cc7a0774f1b1d71ecd171fa1f2c2c55a6';
+    r'44e40b9f3183e14befef307ad7ac5308881e4562';
 
 @ProviderFor(currentBrowseResultLivePreviews)
 const currentBrowseResultLivePreviewsProvider =
@@ -98,7 +98,7 @@ final class CurrentBrowseResultLivePreviewsProvider
 }
 
 String _$currentBrowseResultLivePreviewsHash() =>
-    r'8b14b806c971456bb497547879b033975921cd64';
+    r'0a5b80fc77828455b79aa8f8efd64ae0dce57ec9';
 
 @ProviderFor(MemoryToolBrowseController)
 const memoryToolBrowseControllerProvider =

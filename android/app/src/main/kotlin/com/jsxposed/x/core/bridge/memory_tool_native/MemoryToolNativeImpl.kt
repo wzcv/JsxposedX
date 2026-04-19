@@ -363,6 +363,25 @@ class MemoryToolNativeImpl(val context: Context) : MemoryToolNative {
         }
     }
 
+    override fun disassembleMemory(
+        pid: Long,
+        addresses: List<Long>,
+        callback: (Result<List<MemoryInstructionPreview>>) -> Unit
+    ) {
+        scope.launch {
+            try {
+                val result = memoryTool.disassembleMemory(pid.toInt(), addresses)
+                withContext(Dispatchers.Main) {
+                    callback(Result.success(result))
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    callback(Result.failure(e))
+                }
+            }
+        }
+    }
+
     override fun readMemoryValues(requests: List<MemoryReadRequest>, callback: (Result<List<MemoryValuePreview>>) -> Unit) {
         scope.launch {
             try {

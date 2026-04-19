@@ -62,6 +62,8 @@ object MemoryToolHelperNativeBridge {
         inputText: String
     ): String
 
+    external fun disassembleMemoryJson(pid: Long, addresses: LongArray): String
+
     external fun readMemoryValuesJson(
         pids: LongArray,
         addresses: LongArray,

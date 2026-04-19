@@ -222,6 +222,10 @@ class MemoryTool(private val context: Context) {
         return daemonClient.patchMemoryInstruction(request)
     }
 
+    fun disassembleMemory(pid: Int, addresses: List<Long>): List<MemoryInstructionPreview> {
+        return daemonClient.disassembleMemory(pid, addresses)
+    }
+
     fun readMemoryValues(requests: List<MemoryReadRequest>): List<MemoryValuePreview> {
         return daemonClient.readMemoryValues(requests)
     }

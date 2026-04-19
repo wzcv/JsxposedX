@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:JsxposedX/common/pages/toast.dart';
 import 'package:JsxposedX/core/extensions/context_extensions.dart';
@@ -19,6 +20,7 @@ import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memo
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_result_selection_bar.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_result_stats_bar.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_search_result_action_dialog.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_value_editor_dialog.dart';
 import 'package:JsxposedX/features/overlay_window/presentation/providers/overlay_window_host_runtime_provider.dart';
 import 'package:JsxposedX/generated/memory_tool.g.dart';
 import 'package:flutter/material.dart';
@@ -63,10 +65,13 @@ class MemoryToolDebugTab extends HookConsumerWidget {
         useState<List<MemoryToolSearchResultActionItemData>?>(null);
     final activeInstructionEditor =
         useState<_MemoryToolDebugInstructionEditorState?>(null);
+    final activeValueEditor = useState<_MemoryToolDebugValueEditorState?>(null);
     final patchedInstructions =
         useState<Map<int, MemoryInstructionPatchResult>>(
           <int, MemoryInstructionPatchResult>{},
         );
+    final editedValuePreviews =
+        useState<Map<int, MemoryValuePreview>>(<int, MemoryValuePreview>{});
     final pendingInstructionAddresses = useState<Set<int>>(<int>{});
     final compactTabController = useTabController(initialLength: 3);
     final landscapeDetailTabController = useTabController(initialLength: 2);
@@ -98,7 +103,9 @@ class MemoryToolDebugTab extends HookConsumerWidget {
       selectedWriterKey.value = null;
       selectedHitKey.value = null;
       activeInstructionEditor.value = null;
+      activeValueEditor.value = null;
       patchedInstructions.value = <int, MemoryInstructionPatchResult>{};
+      editedValuePreviews.value = <int, MemoryValuePreview>{};
       pendingInstructionAddresses.value = <int>{};
       compactTabController.index = 0;
       landscapeDetailTabController.index = 0;
@@ -266,10 +273,29 @@ class MemoryToolDebugTab extends HookConsumerWidget {
       hits: selectedWriterGroup?.hits ?? const <MemoryBreakpointHit>[],
       selectedHitKey: selectedHitKey.value,
     );
-    final selectedValueInfo = resolveMemoryToolDebugBreakpointValueInfo(
+    final resolvedValueInfo = resolveMemoryToolDebugBreakpointValueInfo(
       breakpoint: selectedBreakpoint,
       hit: selectedHit,
     );
+    final selectedValuePreviewOverride = selectedBreakpoint == null
+        ? null
+        : editedValuePreviews.value[selectedBreakpoint.address];
+    final selectedValueInfo =
+        resolvedValueInfo == null || selectedValuePreviewOverride == null
+        ? resolvedValueInfo
+        : MemoryToolDebugBreakpointValueInfo(
+            rawBytes: selectedValuePreviewOverride.rawBytes,
+            displayValue: selectedValuePreviewOverride.displayValue,
+            preview: selectedValuePreviewOverride,
+            result: SearchResult(
+              address: selectedValuePreviewOverride.address,
+              regionStart: resolvedValueInfo.result.regionStart,
+              regionTypeKey: resolvedValueInfo.result.regionTypeKey,
+              type: selectedValuePreviewOverride.type,
+              rawBytes: selectedValuePreviewOverride.rawBytes,
+              displayValue: selectedValuePreviewOverride.displayValue,
+            ),
+          );
     final selectedHitChangeInfo = buildMemoryToolDebugHitChangeInfo(
       breakpoint: selectedBreakpoint,
       hit: selectedHit,
@@ -333,6 +359,39 @@ class MemoryToolDebugTab extends HookConsumerWidget {
       );
     }
 
+    Future<void> storeEditedValuePreview({
+      required int address,
+      required SearchValueType type,
+      required int sourceLength,
+      required String fallbackDisplayValue,
+    }) async {
+      final previews = await ref.read(memoryQueryRepositoryProvider).readMemoryValues(
+        requests: <MemoryReadRequest>[
+          MemoryReadRequest(
+            pid: pid,
+            address: address,
+            type: type,
+            length: resolveMemoryToolReadLengthForType(
+              type: type,
+              bytesLength: sourceLength,
+            ),
+          ),
+        ],
+      );
+      final updatedPreview = previews.isNotEmpty
+          ? previews.first
+          : MemoryValuePreview(
+              address: address,
+              type: type,
+              rawBytes: Uint8List(sourceLength),
+              displayValue: fallbackDisplayValue,
+            );
+      editedValuePreviews.value = <int, MemoryValuePreview>{
+        ...editedValuePreviews.value,
+        address: updatedPreview,
+      };
+    }
+
     void openDetailActions(List<MemoryToolSearchResultActionItemData> actions) {
       if (actions.isEmpty) {
         return;
@@ -341,11 +400,37 @@ class MemoryToolDebugTab extends HookConsumerWidget {
     }
 
     List<MemoryToolSearchResultActionItemData> buildCurrentValueActions() {
-      if (selectedValueInfo == null || selectedHit == null) {
+      if (selectedValueInfo == null || selectedHit == null || selectedBreakpoint == null) {
         return const <MemoryToolSearchResultActionItemData>[];
       }
       final valueInfo = selectedValueInfo;
+      final breakpoint = selectedBreakpoint;
       return <MemoryToolSearchResultActionItemData>[
+        MemoryToolSearchResultActionItemData(
+          icon: Icons.preview_rounded,
+          title: context.l10n.memoryToolDebugActionBrowseAddress,
+          onTap: () async {
+            activeDetailActions.value = null;
+            await previewRawAddress(
+              targetAddress: breakpoint.address,
+              type: breakpoint.type,
+              bytesLength: breakpoint.length,
+            );
+          },
+        ),
+        MemoryToolSearchResultActionItemData(
+          icon: Icons.edit_outlined,
+          title: context.isZh ? '修改当前值' : 'Edit Current Value',
+          onTap: () async {
+            activeDetailActions.value = null;
+            activeValueEditor.value = _MemoryToolDebugValueEditorState(
+              address: breakpoint.address,
+              type: breakpoint.type,
+              preview: valueInfo.preview,
+              regionTypeKey: valueInfo.result.regionTypeKey,
+            );
+          },
+        ),
         MemoryToolSearchResultActionItemData(
           icon: Icons.tune_rounded,
           title: context.l10n.memoryToolDebugActionCopyValue,
@@ -500,6 +585,18 @@ class MemoryToolDebugTab extends HookConsumerWidget {
               activeDetailActions.value = null;
             },
           ),
+        MemoryToolSearchResultActionItemData(
+          icon: Icons.preview_rounded,
+          title: context.l10n.memoryToolDebugActionBrowseAddress,
+          onTap: () async {
+            activeDetailActions.value = null;
+            await previewRawAddress(
+              targetAddress: address,
+              type: SearchValueType.bytes,
+              bytesLength: 4,
+            );
+          },
+        ),
         MemoryToolSearchResultActionItemData(
           icon: Icons.edit_outlined,
           title: context.isZh ? '编辑指令' : 'Edit Instruction',
@@ -1013,6 +1110,34 @@ class MemoryToolDebugTab extends HookConsumerWidget {
               },
             ),
           ),
+        if (activeValueEditor.value case final editor?)
+          Positioned.fill(
+            child: _MemoryToolDebugValueEditorDialog(
+              editor: editor,
+              onSaved: (preview) {
+                editedValuePreviews.value = <int, MemoryValuePreview>{
+                  ...editedValuePreviews.value,
+                  preview.address: preview,
+                };
+              },
+              onStoreEditedValuePreview: ({
+                required int address,
+                required SearchValueType type,
+                required int sourceLength,
+                required String fallbackDisplayValue,
+              }) async {
+                await storeEditedValuePreview(
+                  address: address,
+                  type: type,
+                  sourceLength: sourceLength,
+                  fallbackDisplayValue: fallbackDisplayValue,
+                );
+              },
+              onClose: () {
+                activeValueEditor.value = null;
+              },
+            ),
+          ),
       ],
     );
   }
@@ -1026,6 +1151,166 @@ class _MemoryToolDebugInstructionEditorState {
 
   final int address;
   final String currentValue;
+}
+
+class _MemoryToolDebugValueEditorState {
+  const _MemoryToolDebugValueEditorState({
+    required this.address,
+    required this.type,
+    required this.preview,
+    required this.regionTypeKey,
+  });
+
+  final int address;
+  final SearchValueType type;
+  final MemoryValuePreview preview;
+  final String regionTypeKey;
+}
+
+class _MemoryToolDebugValueEditorDialog extends HookConsumerWidget {
+  const _MemoryToolDebugValueEditorDialog({
+    required this.editor,
+    required this.onSaved,
+    required this.onStoreEditedValuePreview,
+    required this.onClose,
+  });
+
+  final _MemoryToolDebugValueEditorState editor;
+  final ValueChanged<MemoryValuePreview> onSaved;
+  final Future<void> Function({
+    required int address,
+    required SearchValueType type,
+    required int sourceLength,
+    required String fallbackDisplayValue,
+  })
+  onStoreEditedValuePreview;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selectedType = useState(editor.type);
+    final valueController = useTextEditingController(
+      text: editor.preview.displayValue,
+    );
+    useListenable(valueController);
+    final valueActionState = ref.watch(memoryValueActionProvider);
+
+    Future<void> handleSave() async {
+      try {
+        var littleEndian = true;
+        try {
+          final searchSessionState = await ref.read(
+            getSearchSessionStateProvider.future,
+          );
+          littleEndian = searchSessionState.littleEndian;
+        } catch (_) {}
+
+        final inputValue = valueController.text.trim();
+        final writeValue = buildMemoryToolWriteValue(
+          type: selectedType.value,
+          input: inputValue,
+          littleEndian: littleEndian,
+          sourceType: editor.preview.type,
+          sourceRawBytes: editor.preview.rawBytes,
+          sourceDisplayValue: editor.preview.displayValue,
+        );
+
+        await ref.read(memoryValueActionProvider.notifier).writeMemoryValue(
+          request: MemoryWriteRequest(
+            address: editor.address,
+            value: writeValue,
+          ),
+          previousPreview: editor.preview,
+        );
+
+        await onStoreEditedValuePreview(
+          address: editor.address,
+          type: selectedType.value,
+          sourceLength: editor.preview.rawBytes.length,
+          fallbackDisplayValue: inputValue,
+        );
+
+        final selectedPid = ref.read(memoryToolSelectedProcessProvider)?.pid;
+        if (selectedPid != null) {
+          final updatedPreviews = await ref
+              .read(memoryQueryRepositoryProvider)
+              .readMemoryValues(
+                requests: <MemoryReadRequest>[
+                  MemoryReadRequest(
+                    pid: selectedPid,
+                    address: editor.address,
+                    type: selectedType.value,
+                    length: resolveMemoryToolReadLengthForType(
+                      type: selectedType.value,
+                      bytesLength: editor.preview.rawBytes.length,
+                    ),
+                  ),
+                ],
+              );
+          if (updatedPreviews.isNotEmpty) {
+            onSaved(updatedPreviews.first);
+          }
+        }
+
+        if (!context.mounted) {
+          return;
+        }
+        onClose();
+      } catch (_) {
+        return;
+      }
+    }
+
+    return MemoryToolValueEditorDialog(
+      title: context.isZh ? '修改当前值' : 'Edit Current Value',
+      subtitle: formatMemoryToolSearchResultAddress(editor.address),
+      selectedTypeLabel: mapMemoryToolSearchResultTypeLabel(
+        type: selectedType.value,
+        displayValue: selectedType.value == SearchValueType.bytes
+            ? editor.preview.displayValue
+            : '',
+      ),
+      typeLabelBuilder: (type) {
+        return mapMemoryToolSearchResultTypeLabel(
+          type: type,
+          displayValue: type == SearchValueType.bytes
+              ? editor.preview.displayValue
+              : '',
+        );
+      },
+      onSelectedType: (type) {
+        selectedType.value = type;
+      },
+      valueController: valueController,
+      metadata: <MemoryToolValueEditorMeta>[
+        MemoryToolValueEditorMeta(
+          label: context.l10n.memoryToolResultAddress,
+          value: formatMemoryToolSearchResultAddress(editor.address),
+        ),
+        MemoryToolValueEditorMeta(
+          label: context.l10n.memoryToolResultType,
+          value: mapMemoryToolSearchResultTypeLabel(
+            type: selectedType.value,
+            displayValue: selectedType.value == SearchValueType.bytes
+                ? editor.preview.displayValue
+                : '',
+          ),
+        ),
+        MemoryToolValueEditorMeta(
+          label: context.l10n.memoryToolResultRegion,
+          value: mapMemoryToolSearchResultRegionTypeLabel(
+            context,
+            editor.regionTypeKey,
+          ),
+        ),
+      ],
+      errorText: valueActionState.error?.toString(),
+      canSave:
+          valueController.text.trim().isNotEmpty && !valueActionState.isLoading,
+      onSave: handleSave,
+      onClose: onClose,
+    );
+  }
 }
 
 class _MemoryToolDebugCompactWorkbench extends StatelessWidget {

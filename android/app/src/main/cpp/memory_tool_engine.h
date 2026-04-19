@@ -66,6 +66,10 @@ public:
                                                       uint64_t address,
                                                       const std::string& input_text);
 
+    std::vector<MemoryInstructionView> DisassembleMemory(
+        int pid,
+        const std::vector<uint64_t>& addresses);
+
     std::vector<MemoryValuePreview> ReadMemoryValues(const std::vector<MemoryReadRequest>& requests);
 
     void WriteMemoryValue(const MemoryWriteRequest& request);

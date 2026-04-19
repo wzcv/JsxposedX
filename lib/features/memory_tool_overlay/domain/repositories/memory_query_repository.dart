@@ -30,6 +30,11 @@ abstract class MemoryQueryRepository {
     required List<MemoryReadRequest> requests,
   });
 
+  Future<List<MemoryInstructionPreview>> disassembleMemory({
+    required int pid,
+    required List<int> addresses,
+  });
+
   Future<List<MemoryBreakpoint>> listMemoryBreakpoints({required int pid});
 
   Future<MemoryBreakpointState> getMemoryBreakpointState({required int pid});

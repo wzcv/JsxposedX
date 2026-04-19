@@ -322,6 +322,27 @@ std::string SerializeInstructionPatchResult(const InstructionPatchResultView& re
     return stream.str();
 }
 
+std::string SerializeMemoryInstructions(const std::vector<MemoryInstructionView>& instructions) {
+    std::ostringstream stream;
+    stream << '[';
+    for (size_t index = 0; index < instructions.size(); ++index) {
+        const MemoryInstructionView& instruction = instructions[index];
+        if (index > 0) {
+            stream << ',';
+        }
+        stream << '{'
+               << "\"address\":" << instruction.address << ','
+               << "\"architecture\":\"" << utils::JsonEscape(instruction.architecture) << "\","
+               << "\"instructionSize\":" << instruction.instruction_size << ','
+               << "\"rawBytesHex\":\"" << utils::HexEncode(instruction.raw_bytes) << "\","
+               << "\"instructionText\":\"" << utils::JsonEscape(instruction.instruction_text)
+               << "\""
+               << '}';
+    }
+    stream << ']';
+    return stream.str();
+}
+
 std::string SerializeMemoryValuePreviews(const std::vector<MemoryValuePreview>& previews) {
     std::ostringstream stream;
     stream << '[';

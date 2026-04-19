@@ -3,12 +3,15 @@
 #include <capstone/capstone.h>
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cerrno>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <dirent.h>
+#include <elf.h>
+#include <fcntl.h>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
@@ -29,37 +32,101 @@ struct InstructionDecodeConfig {
     const char* architecture = "unknown";
     size_t read_size = 0;
     cs_arch arch = CS_ARCH_ALL;
-    cs_mode mode = CS_MODE_LITTLE_ENDIAN;
+    cs_mode primary_mode = CS_MODE_LITTLE_ENDIAN;
+    cs_mode secondary_mode = CS_MODE_LITTLE_ENDIAN;
+    bool has_secondary_mode = false;
+    uint64_t read_address = 0;
+    uint64_t instruction_address = 0;
 };
 
-bool ResolveInstructionDecodeConfig(InstructionDecodeConfig* config) {
+bool ReadProcessElfHeader(int pid, std::array<uint8_t, 32>* header) {
+    if (header == nullptr || pid <= 0) {
+        return false;
+    }
+
+    const std::string executable_path = "/proc/" + std::to_string(pid) + "/exe";
+    const int fd = open(executable_path.c_str(), O_RDONLY | O_CLOEXEC);
+    if (fd < 0) {
+        return false;
+    }
+
+    ssize_t total_read = 0;
+    while (total_read < static_cast<ssize_t>(header->size())) {
+        const ssize_t current_read = read(
+            fd,
+            header->data() + total_read,
+            header->size() - static_cast<size_t>(total_read));
+        if (current_read <= 0) {
+            break;
+        }
+        total_read += current_read;
+    }
+    close(fd);
+
+    if (total_read < 20) {
+        return false;
+    }
+    return std::memcmp(header->data(), ELFMAG, SELFMAG) == 0;
+}
+
+bool ResolveInstructionDecodeConfig(int pid,
+                                    uint64_t address,
+                                    InstructionDecodeConfig* config) {
     if (config == nullptr) {
         return false;
+    }
+
+    config->read_address = address;
+    config->instruction_address = address;
+
+    std::array<uint8_t, 32> header{};
+    if (ReadProcessElfHeader(pid, &header)) {
+        const uint8_t elf_class = header[EI_CLASS];
+        const uint16_t machine = static_cast<uint16_t>(header[18]) |
+                                 (static_cast<uint16_t>(header[19]) << 8U);
+        if (machine == EM_AARCH64 || elf_class == ELFCLASS64) {
+            config->architecture = "aarch64";
+            config->read_size = 4;
+            config->arch = CS_ARCH_ARM64;
+            config->primary_mode = CS_MODE_LITTLE_ENDIAN;
+            return true;
+        }
+        if (machine == EM_ARM || elf_class == ELFCLASS32) {
+            config->architecture = "arm";
+            config->read_size = 4;
+            config->arch = CS_ARCH_ARM;
+            if ((address & 1ULL) != 0) {
+                config->read_address = address - 1ULL;
+                config->instruction_address = address - 1ULL;
+                config->primary_mode = static_cast<cs_mode>(
+                    CS_MODE_THUMB | CS_MODE_LITTLE_ENDIAN);
+                config->secondary_mode = static_cast<cs_mode>(
+                    CS_MODE_ARM | CS_MODE_LITTLE_ENDIAN);
+                config->has_secondary_mode = true;
+            } else {
+                config->primary_mode = static_cast<cs_mode>(
+                    CS_MODE_ARM | CS_MODE_LITTLE_ENDIAN);
+                config->secondary_mode = static_cast<cs_mode>(
+                    CS_MODE_THUMB | CS_MODE_LITTLE_ENDIAN);
+                config->has_secondary_mode = true;
+            }
+            return true;
+        }
     }
 
 #if defined(__aarch64__)
     config->architecture = "aarch64";
     config->read_size = 4;
     config->arch = CS_ARCH_ARM64;
-    config->mode = CS_MODE_LITTLE_ENDIAN;
+    config->primary_mode = CS_MODE_LITTLE_ENDIAN;
     return true;
 #elif defined(__arm__)
     config->architecture = "arm";
     config->read_size = 4;
     config->arch = CS_ARCH_ARM;
-    config->mode = static_cast<cs_mode>(CS_MODE_ARM | CS_MODE_LITTLE_ENDIAN);
-    return true;
-#elif defined(__x86_64__)
-    config->architecture = "x86_64";
-    config->read_size = 16;
-    config->arch = CS_ARCH_X86;
-    config->mode = CS_MODE_64;
-    return true;
-#elif defined(__i386__)
-    config->architecture = "x86";
-    config->read_size = 16;
-    config->arch = CS_ARCH_X86;
-    config->mode = CS_MODE_32;
+    config->primary_mode = static_cast<cs_mode>(CS_MODE_ARM | CS_MODE_LITTLE_ENDIAN);
+    config->secondary_mode = static_cast<cs_mode>(CS_MODE_THUMB | CS_MODE_LITTLE_ENDIAN);
+    config->has_secondary_mode = true;
     return true;
 #else
     return false;
@@ -72,6 +139,46 @@ std::string FormatHexFallback(const std::vector<uint8_t>& bytes) {
         return {};
     }
     return encoded;
+}
+
+bool TryDisassembleWithMode(const InstructionDecodeConfig& config,
+                            const std::vector<uint8_t>& raw_bytes,
+                            cs_mode mode,
+                            MemoryInstructionInfo* info) {
+    if (info == nullptr) {
+        return false;
+    }
+
+    csh handle = 0;
+    if (cs_open(config.arch, mode, &handle) != CS_ERR_OK) {
+        return false;
+    }
+
+    cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF);
+    cs_insn* instruction = nullptr;
+    const size_t count = cs_disasm(
+        handle,
+        raw_bytes.data(),
+        raw_bytes.size(),
+        config.instruction_address,
+        1,
+        &instruction);
+    if (count > 0 && instruction != nullptr) {
+        info->size = instruction[0].size;
+        info->raw_bytes.assign(raw_bytes.begin(), raw_bytes.begin() + info->size);
+        info->text = instruction[0].mnemonic;
+        if (instruction[0].op_str[0] != '\0') {
+            info->text += ' ';
+            info->text += instruction[0].op_str;
+        }
+        info->is_valid = true;
+    }
+
+    if (instruction != nullptr) {
+        cs_free(instruction, count);
+    }
+    cs_close(&handle);
+    return info->is_valid;
 }
 
 std::vector<int> ReadProcessThreadIds(int pid) {
@@ -496,54 +603,38 @@ MemoryInstructionInfo ReadMemoryInstruction(int pid, uint64_t address) {
     }
 
     InstructionDecodeConfig config;
-    if (!ResolveInstructionDecodeConfig(&config)) {
+    if (!ResolveInstructionDecodeConfig(pid, address, &config)) {
         return info;
     }
 
     info.architecture = config.architecture;
 
     ProcessMemoryReader reader(pid);
-    if (!reader.Read(address, config.read_size, &info.raw_bytes)) {
+    std::vector<uint8_t> raw_bytes;
+    if (!reader.Read(config.read_address, config.read_size, &raw_bytes)) {
         return info;
     }
 
-    csh handle = 0;
-    if (cs_open(config.arch, config.mode, &handle) != CS_ERR_OK) {
-        info.size = info.raw_bytes.size();
-        info.text = FormatHexFallback(info.raw_bytes);
-        info.is_valid = true;
-        return info;
-    }
-
-    cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF);
-    cs_insn* instruction = nullptr;
-    const size_t count = cs_disasm(
-        handle,
-        info.raw_bytes.data(),
-        info.raw_bytes.size(),
-        address,
-        1,
-        &instruction);
-    if (count > 0 && instruction != nullptr) {
-        info.size = instruction[0].size;
-        info.raw_bytes.resize(info.size);
-        info.text = instruction[0].mnemonic;
-        if (instruction[0].op_str[0] != '\0') {
-            info.text += ' ';
-            info.text += instruction[0].op_str;
-        }
-        info.is_valid = true;
-    } else {
+    if (!TryDisassembleWithMode(config, raw_bytes, config.primary_mode, &info) &&
+        !(config.has_secondary_mode &&
+          TryDisassembleWithMode(config, raw_bytes, config.secondary_mode, &info))) {
+        info.raw_bytes = raw_bytes;
         info.size = info.raw_bytes.size();
         info.text = FormatHexFallback(info.raw_bytes);
         info.is_valid = true;
     }
-
-    if (instruction != nullptr) {
-        cs_free(instruction, count);
-    }
-    cs_close(&handle);
     return info;
+}
+
+std::vector<MemoryInstructionInfo> ReadMemoryInstructions(
+    int pid,
+    const std::vector<uint64_t>& addresses) {
+    std::vector<MemoryInstructionInfo> instructions;
+    instructions.reserve(addresses.size());
+    for (uint64_t address : addresses) {
+        instructions.push_back(ReadMemoryInstruction(pid, address));
+    }
+    return instructions;
 }
 
 InstructionPatchResultView PatchMemoryInstructionAtAddress(int pid,

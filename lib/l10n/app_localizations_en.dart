@@ -2494,6 +2494,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get memoryToolResultCalculatorXor => 'XOR';
 
   @override
+  String get memoryToolAssemblyPreviewTitle => 'Assembly Preview';
+
+  @override
+  String memoryToolAssemblyPreviewCount(int count) {
+    return '$count addresses';
+  }
+
+  @override
+  String get memoryToolAssemblyPreviewEmpty => 'No assembly can be rendered.';
+
+  @override
   String get memoryToolResultSelectionDialogTitle => 'Result List Settings';
 
   @override
