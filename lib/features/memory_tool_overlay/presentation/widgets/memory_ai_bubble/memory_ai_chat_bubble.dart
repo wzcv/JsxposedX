@@ -3,6 +3,7 @@ import 'package:JsxposedX/features/ai/presentation/widgets/ai_chat_bubble/ai_cha
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_ai_bubble/memory_ai_bubble_container.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_ai_bubble/memory_ai_bubble_content.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_ai_bubble/memory_ai_bubble_state.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_ai_bubble/memory_ai_bubble_toolbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 
@@ -45,6 +46,11 @@ class MemoryAiChatBubble extends BaseAiChatBubble {
   @override
   MemoryAiBubbleContentPart createContentPart() {
     return const MemoryAiBubbleContentPart();
+  }
+
+  @override
+  MemoryAiBubbleToolbarPart createToolbarPart() {
+    return const MemoryAiBubbleToolbarPart();
   }
 }
 
