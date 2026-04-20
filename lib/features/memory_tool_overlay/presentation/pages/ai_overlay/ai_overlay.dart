@@ -384,6 +384,26 @@ class _AiOverlayViewport extends HookConsumerWidget {
       ref.read(memoryToolSavedItemSelectionProvider.notifier).clearSelection();
     }
 
+    void removeSelectionTag(MemoryAiOverlaySelectionTag tag) {
+      switch (tag.source) {
+        case MemoryAiOverlaySelectionSource.search:
+          ref
+              .read(memoryToolResultSelectionProvider.notifier)
+              .removeAddress(tag.address);
+          break;
+        case MemoryAiOverlaySelectionSource.browse:
+          ref
+              .read(memoryToolBrowseControllerProvider.notifier)
+              .hideAddress(tag.address);
+          break;
+        case MemoryAiOverlaySelectionSource.saved:
+          ref
+              .read(memoryToolSavedItemSelectionProvider.notifier)
+              .removeAddress(tag.address);
+          break;
+      }
+    }
+
     String composeSelectionTagMessage(String rawText) {
       if (selectionTags.isEmpty) {
         return rawText.trim();
@@ -780,6 +800,7 @@ class _AiOverlayViewport extends HookConsumerWidget {
                                           ),
                                           MemoryAiSelectionTagBar(
                                             tags: selectionTags,
+                                            onRemoveTag: removeSelectionTag,
                                           ),
                                           SizedBox(
                                             height:

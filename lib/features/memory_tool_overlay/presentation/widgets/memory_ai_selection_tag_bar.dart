@@ -4,9 +4,14 @@ import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/me
 import 'package:flutter/material.dart';
 
 class MemoryAiSelectionTagBar extends StatelessWidget {
-  const MemoryAiSelectionTagBar({super.key, required this.tags});
+  const MemoryAiSelectionTagBar({
+    super.key,
+    required this.tags,
+    required this.onRemoveTag,
+  });
 
   final List<MemoryAiOverlaySelectionTag> tags;
+  final void Function(MemoryAiOverlaySelectionTag tag) onRemoveTag;
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +28,10 @@ class MemoryAiSelectionTagBar extends StatelessWidget {
         itemCount: tags.length,
         separatorBuilder: (_, __) => SizedBox(width: 8 * scale),
         itemBuilder: (context, index) {
-          return _MemoryAiSelectionTagChip(tag: tags[index]);
+          return _MemoryAiSelectionTagChip(
+            tag: tags[index],
+            onTap: () => onRemoveTag(tags[index]),
+          );
         },
       ),
     );
@@ -31,75 +39,92 @@ class MemoryAiSelectionTagBar extends StatelessWidget {
 }
 
 class _MemoryAiSelectionTagChip extends StatelessWidget {
-  const _MemoryAiSelectionTagChip({required this.tag});
+  const _MemoryAiSelectionTagChip({required this.tag, required this.onTap});
 
   final MemoryAiOverlaySelectionTag tag;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final scale = AiChatCompactScope.scaleOf(context);
     final theme = _MemoryAiSelectionChipTheme.resolve(context, tag.source);
     final summary = '${tag.addressLabel} = ${tag.valueLabel}';
-    return Container(
-      constraints: BoxConstraints(maxWidth: 182 * scale),
-      decoration: BoxDecoration(
-        color: theme.backgroundColor,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(theme.radius * scale),
-        border: Border.all(color: theme.borderColor, width: theme.borderWidth),
-      ),
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: 8 * scale,
-          vertical: 4 * scale,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Container(
-              width: 18 * scale,
-              height: 18 * scale,
-              decoration: BoxDecoration(
-                color: theme.iconBackgroundColor,
-                borderRadius: BorderRadius.circular(theme.iconRadius * scale),
-              ),
-              child: Icon(theme.icon, size: 11 * scale, color: theme.iconColor),
+        onTap: onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: theme.backgroundColor,
+            borderRadius: BorderRadius.circular(theme.radius * scale),
+            border: Border.all(
+              color: theme.borderColor,
+              width: theme.borderWidth,
             ),
-            SizedBox(width: 6 * scale),
-            Flexible(
-              child: Text(
-                summary,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: context.textTheme.bodySmall?.copyWith(
-                  color: theme.valueColor,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 10 * scale,
+          ),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: 8 * scale,
+              vertical: 4 * scale,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Container(
+                  width: 18 * scale,
+                  height: 18 * scale,
+                  decoration: BoxDecoration(
+                    color: theme.iconBackgroundColor,
+                    borderRadius: BorderRadius.circular(
+                      theme.iconRadius * scale,
+                    ),
+                  ),
+                  child: Icon(
+                    theme.icon,
+                    size: 11 * scale,
+                    color: theme.iconColor,
+                  ),
                 ),
-              ),
-            ),
-            SizedBox(width: 6 * scale),
-            Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: 5 * scale,
-                vertical: 1 * scale,
-              ),
-              decoration: BoxDecoration(
-                color: theme.badgeBackgroundColor,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                tag.typeLabel,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: context.textTheme.labelSmall?.copyWith(
-                  color: theme.badgeForegroundColor,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 8.5 * scale,
-                  height: 1,
+                SizedBox(width: 6 * scale),
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: 128 * scale),
+                  child: Text(
+                    summary,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.textTheme.bodySmall?.copyWith(
+                      color: theme.valueColor,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 10 * scale,
+                    ),
+                  ),
                 ),
-              ),
+                SizedBox(width: 6 * scale),
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 5 * scale,
+                    vertical: 1 * scale,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.badgeBackgroundColor,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    tag.typeLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.textTheme.labelSmall?.copyWith(
+                      color: theme.badgeForegroundColor,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 8.5 * scale,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
