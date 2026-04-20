@@ -1,7 +1,7 @@
 import 'package:JsxposedX/generated/memory_tool.g.dart';
 
 class MemoryAiOverlayPromptBuilder {
-  static const String promptVersion = 'memory_overlay_prompt_v2';
+  static const String promptVersion = 'memory_overlay_prompt_v3';
 
   MemoryAiOverlayPromptBuilder({bool isZh = true})
     : _isZh = isZh,
@@ -77,7 +77,7 @@ class MemoryAiOverlayPromptBuilder {
 - 当前聊天已经绑定到一个具体进程，只能围绕该进程工作，不要假设可以切换到别的进程。
 - 对会改变目标进程状态的操作（写值、冻结、补丁、断点、暂停/恢复）要先说明意图，再执行必要工具。
 - 当用户目标不明确时，先给出最小必要的查询步骤；当信息足够且任务状态已经稳定时，直接给出结论与必要动作。
-- 对搜索任务、指针扫描、自动追链这类分阶段任务，只要状态仍在运行中、进度未完成或结果还不够支撑结论，就优先继续查询对应 overview / results，不要过早口头宣布完成。
+- 对搜索任务、指针扫描（也就是扫基址 / 基址扫描）、自动追链这类分阶段任务，只要状态仍在运行中、进度未完成或结果还不够支撑结论，就优先继续查询对应 overview / results，不要过早口头宣布完成。
 - 对上述分阶段任务，不要让用户“等一下再看”、不要把“下一步建议”当成回复主体；默认应由你继续主动查询，直到任务结束、被取消、失败，或已经拿到足够稳定的结果。
 - 启动或继续搜索/指针扫描/自动追链后，如果任务尚未稳定，不要立刻输出自然语言总结，更不要输出“建议接着调用某工具”这类废话；要么继续查询，要么等待本轮工具阶段拿到稳定状态后再回答。
 - 工具结果已经展示给用户，回复里不要原样大量粘贴工具输出，而是基于结果总结重点。''';
@@ -106,7 +106,7 @@ Rules:
 - `list_saved_items` / `list_value_history` / `list_instruction_patch_history` 查看暂存区与恢复历史
 - `read_memory` / `disassemble_memory` 读取地址内容或反汇编指令
 - `get_breakpoint_overview` / `list_memory_breakpoints` / `get_memory_breakpoint_hits` 查看断点调试信息
-- `get_pointer_scan_overview` / `get_pointer_scan_results` / `get_pointer_auto_chase_overview` 查看指针链状态
+- `get_pointer_scan_overview` / `get_pointer_scan_results` / `get_pointer_auto_chase_overview` 查看指针链状态；其中 `pointer scan` 可理解为扫基址 / 基址扫描
 
 操作类：
 - `start_first_scan` / `continue_next_scan` / `cancel_search` / `reset_search_session`
@@ -117,7 +117,7 @@ Rules:
 - `set_process_paused`
 - `add_memory_breakpoint` / `remove_memory_breakpoint` / `set_memory_breakpoint_enabled`
 - `clear_memory_breakpoint_hits` / `resume_after_breakpoint`
-- `start_pointer_scan` / `cancel_pointer_scan` / `reset_pointer_scan_session`
+- `start_pointer_scan` / `cancel_pointer_scan` / `reset_pointer_scan_session`：扫基址 / 基址扫描
 - `start_pointer_auto_chase` / `cancel_pointer_auto_chase` / `reset_pointer_auto_chase`
 
 关键约束：

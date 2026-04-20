@@ -367,6 +367,12 @@ class _MemoryAiSection extends StatelessWidget {
         fields: section.overviewFields,
       );
     }
+    if (_isPointerScanTaskOverview(section.title, section.overviewFields)) {
+      return _MemoryAiPointerScanOverviewCard(
+        title: section.title,
+        fields: section.overviewFields,
+      );
+    }
     final scale = AiChatCompactScope.scaleOf(context);
     final children = <Widget>[];
 
@@ -859,6 +865,180 @@ class _MemoryAiSearchTaskCardFromState extends StatelessWidget {
   }
 }
 
+class _MemoryAiPointerScanOverviewCard extends StatelessWidget {
+  const _MemoryAiPointerScanOverviewCard({
+    required this.title,
+    required this.fields,
+  });
+
+  final String? title;
+  final Map<String, String> fields;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = AiChatCompactScope.scaleOf(context);
+    final state = _buildPointerScanTaskState(fields);
+    final progress = resolveMemoryToolPointerScanTaskProgress(state);
+    final isRunning = state.status == SearchTaskStatus.running;
+    const borderColor = Color(0xFFC9BCFF);
+    const backgroundColor = Color(0xFFF4F0FF);
+    const chipBackground = Color(0xFFE6DEFF);
+    const accentColor = Color(0xFF7B61FF);
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(18 * scale),
+        border: Border.all(color: borderColor),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(14 * scale),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Container(
+                  width: 34 * scale,
+                  height: 34 * scale,
+                  decoration: BoxDecoration(
+                    color: chipBackground,
+                    borderRadius: BorderRadius.circular(12 * scale),
+                  ),
+                  child: Icon(
+                    Icons.account_tree_rounded,
+                    size: 18 * scale,
+                    color: accentColor,
+                  ),
+                ),
+                SizedBox(width: 10 * scale),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        (title?.trim().isNotEmpty ?? false)
+                            ? title!
+                            : (context.isZh ? '指针扫描任务' : 'Pointer Scan Task'),
+                        style: TextStyle(
+                          fontSize: 12.8 * scale,
+                          fontWeight: FontWeight.w900,
+                          color: context.colorScheme.onSurface,
+                        ),
+                      ),
+                      SizedBox(height: 4 * scale),
+                      Text(
+                        _pointerScanTaskHint(context, state),
+                        style: TextStyle(
+                          fontSize: 10.8 * scale,
+                          fontWeight: FontWeight.w600,
+                          color: context.colorScheme.onSurface.withValues(
+                            alpha: 0.68,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 10 * scale,
+                    vertical: 5 * scale,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: Text(
+                    _statusLabel(context, state.status.name),
+                    style: TextStyle(
+                      fontSize: 10 * scale,
+                      fontWeight: FontWeight.w800,
+                      color: _statusColor(state.status.name),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 14 * scale),
+            if (progress != null) ...<Widget>[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 8 * scale,
+                  backgroundColor: const Color(0xFFDCD2FF),
+                  valueColor: const AlwaysStoppedAnimation<Color>(accentColor),
+                ),
+              ),
+              SizedBox(height: 8 * scale),
+              Text(
+                '${(progress * 100).toStringAsFixed(1)}%',
+                style: TextStyle(
+                  fontSize: 11 * scale,
+                  fontWeight: FontWeight.w800,
+                  color: context.colorScheme.onSurface,
+                ),
+              ),
+              SizedBox(height: 12 * scale),
+            ],
+            Wrap(
+              spacing: 8 * scale,
+              runSpacing: 8 * scale,
+              children: <Widget>[
+                _MemoryAiTaskMetricChip(
+                  label: context.l10n.memoryToolTaskElapsedLabel,
+                  value: _formatElapsedForPointerScanCard(context, state),
+                ),
+                if (state.totalRegions > 0)
+                  _MemoryAiTaskMetricChip(
+                    label: context.l10n.memoryToolTaskRegionsLabel,
+                    value: '${state.processedRegions}/${state.totalRegions}',
+                  ),
+                if (state.totalEntries > 0)
+                  _MemoryAiTaskMetricChip(
+                    label: context.isZh ? '条目' : 'Entries',
+                    value: '${state.processedEntries}/${state.totalEntries}',
+                  ),
+                if (state.totalBytes > 0)
+                  _MemoryAiTaskMetricChip(
+                    label: context.l10n.memoryToolTaskBytesLabel,
+                    value:
+                        '${formatBytesCompact(state.processedBytes)}/${formatBytesCompact(state.totalBytes)}',
+                  ),
+                _MemoryAiTaskMetricChip(
+                  label: context.l10n.memoryToolTaskResultCountLabel,
+                  value: state.resultCount.toString(),
+                ),
+                _MemoryAiTaskMetricChip(
+                  label: context.l10n.memoryToolTaskCancelAction,
+                  value: state.canCancel
+                      ? (context.isZh ? '可用' : 'Enabled')
+                      : (context.isZh ? '不可用' : 'Disabled'),
+                ),
+              ],
+            ),
+            if (!isRunning) ...<Widget>[
+              SizedBox(height: 12 * scale),
+              Text(
+                _pointerScanTaskTerminalHint(context, state),
+                style: TextStyle(
+                  fontSize: 10.8 * scale,
+                  fontWeight: FontWeight.w700,
+                  color: context.colorScheme.onSurface.withValues(alpha: 0.72),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _MemoryAiPointerScanTaskCardFromState extends StatelessWidget {
   const _MemoryAiPointerScanTaskCardFromState({required this.state});
 
@@ -866,13 +1046,9 @@ class _MemoryAiPointerScanTaskCardFromState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _MemoryAiTaskOverviewCard(
+    return _MemoryAiPointerScanOverviewCard(
       title: context.isZh ? '指针扫描任务' : 'Pointer Scan Task',
       fields: _buildPointerScanTaskOverviewFields(state),
-      tone: const _MemoryAiCardTone(
-        accent: Color(0xFF7B61FF),
-        icon: Icons.account_tree_rounded,
-      ),
     );
   }
 }
@@ -1691,6 +1867,15 @@ bool _isSearchTaskOverview(String? title, Map<String, String> fields) {
       (title?.contains('搜索') ?? false);
 }
 
+bool _isPointerScanTaskOverview(String? title, Map<String, String> fields) {
+  final titleText = title ?? '';
+  return fields.containsKey('processedRegions') &&
+      fields.containsKey('processedEntries') &&
+      fields.containsKey('processedBytes') &&
+      !fields.containsKey('currentDepth') &&
+      (titleText.contains('指针扫描') || titleText.contains('Pointer Scan'));
+}
+
 Map<String, String> _buildSearchTaskOverviewFields(SearchTaskState state) {
   return <String, String>{
     'status': state.status.name,
@@ -1737,6 +1922,23 @@ Map<String, String> _buildPointerAutoChaseOverviewFields(
     if (state.pid > 0) 'pid': state.pid.toString(),
     'layers': state.layers.length.toString(),
   };
+}
+
+PointerScanTaskState _buildPointerScanTaskState(Map<String, String> fields) {
+  return PointerScanTaskState(
+    status: _parseSearchTaskStatus(_value(fields, 'status')),
+    pid: 0,
+    processedRegions: _parseTaskCurrent(fields, 'processedRegions'),
+    totalRegions: _parseTaskTotal(fields, 'processedRegions'),
+    processedEntries: _parseTaskCurrent(fields, 'processedEntries'),
+    totalEntries: _parseTaskTotal(fields, 'processedEntries'),
+    processedBytes: _parseTaskCurrent(fields, 'processedBytes'),
+    totalBytes: _parseTaskTotal(fields, 'processedBytes'),
+    resultCount: int.tryParse(_value(fields, 'resultCount')) ?? 0,
+    elapsedMilliseconds: _parseElapsedMilliseconds(_value(fields, 'elapsedMs')),
+    canCancel: _parseBoolValue(_value(fields, 'canCancel')),
+    message: _normalizePointerScanTaskMessageForState(_value(fields, 'message')),
+  );
 }
 
 SearchTaskState _buildSearchTaskState(
@@ -1828,9 +2030,49 @@ String _searchTaskTerminalHint(BuildContext context, SearchTaskState state) {
   }
 }
 
+String _pointerScanTaskHint(BuildContext context, PointerScanTaskState state) {
+  final message = state.message.trim();
+  if (message.isNotEmpty) {
+    return message;
+  }
+  if (state.status == SearchTaskStatus.running) {
+    return context.isZh ? '正在持续同步扫基址进度' : 'Pointer scan is running';
+  }
+  return _pointerScanTaskTerminalHint(context, state);
+}
+
+String _pointerScanTaskTerminalHint(
+  BuildContext context,
+  PointerScanTaskState state,
+) {
+  switch (state.status) {
+    case SearchTaskStatus.completed:
+      return context.isZh ? '指针扫描已完成' : 'Pointer scan completed';
+    case SearchTaskStatus.cancelled:
+      return context.isZh ? '指针扫描已取消' : 'Pointer scan canceled';
+    case SearchTaskStatus.failed:
+      return context.isZh ? '指针扫描失败' : 'Pointer scan failed';
+    case SearchTaskStatus.idle:
+      return context.isZh ? '当前没有活动指针扫描任务' : 'No active pointer scan task';
+    case SearchTaskStatus.running:
+      return context.isZh ? '正在持续同步扫基址进度' : 'Pointer scan is running';
+  }
+}
+
 String _formatElapsedForSearchCard(
   BuildContext context,
   SearchTaskState state,
+) {
+  final raw = formatDurationShort(state.elapsedMilliseconds);
+  if (!context.isZh) {
+    return raw;
+  }
+  return raw.replaceAll('m', '分 ').replaceAll('s', '秒').trim();
+}
+
+String _formatElapsedForPointerScanCard(
+  BuildContext context,
+  PointerScanTaskState state,
 ) {
   final raw = formatDurationShort(state.elapsedMilliseconds);
   if (!context.isZh) {
@@ -1862,6 +2104,45 @@ String _normalizeTaskMessageForState(String value) {
     return '搜索任务失败';
   }
   return message;
+}
+
+String _normalizePointerScanTaskMessageForState(String value) {
+  final message = value.trim();
+  if (message.isEmpty) {
+    return '';
+  }
+  final normalized = message.toLowerCase();
+  if (normalized == 'pointer scan is running.') {
+    return '指针扫描进行中';
+  }
+  if (normalized == 'pointer scan completed.') {
+    return '指针扫描已完成';
+  }
+  if (normalized == 'pointer scan cancelled.' ||
+      normalized == 'pointer scan canceled.') {
+    return '指针扫描已取消';
+  }
+  if (normalized == 'pointer scan failed.') {
+    return '指针扫描失败';
+  }
+  return message;
+}
+
+double? resolveMemoryToolPointerScanTaskProgress(PointerScanTaskState state) {
+  if (state.totalBytes > 0) {
+    return (state.processedBytes / state.totalBytes).clamp(0.0, 1.0).toDouble();
+  }
+  if (state.totalEntries > 0) {
+    return (state.processedEntries / state.totalEntries)
+        .clamp(0.0, 1.0)
+        .toDouble();
+  }
+  if (state.totalRegions > 0) {
+    return (state.processedRegions / state.totalRegions)
+        .clamp(0.0, 1.0)
+        .toDouble();
+  }
+  return null;
 }
 
 String _value(Map<String, String> fields, String key, {String fallback = ''}) {

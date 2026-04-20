@@ -488,7 +488,7 @@ class MemoryAiOverlayToolDefinitions {
 
   static final getPointerScanOverview = AiToolDefinition(
     name: 'get_pointer_scan_overview',
-    description: '获取当前指针扫描会话和任务状态；只要扫描仍在运行或进度未完成，就应优先继续查询本工具而不是提前宣布完成',
+    description: '获取当前指针扫描（扫基址 / 基址扫描）会话和任务状态；只要扫描仍在运行或进度未完成，就应优先继续查询本工具而不是提前宣布完成',
     parameters: ToolParametersBuilder.empty(),
   );
 
@@ -510,7 +510,7 @@ class MemoryAiOverlayToolDefinitions {
 
   static final startPointerScan = AiToolDefinition(
     name: 'start_pointer_scan',
-    description: '从目标地址开始进行指针扫描。发起后应继续调用 get_pointer_scan_overview，任务结束后再读取结果',
+    description: '从目标地址开始进行指针扫描（扫基址 / 基址扫描）。发起后应继续调用 get_pointer_scan_overview，任务结束后再读取结果',
     parameters:
         (ToolParametersBuilder()
               ..addString('targetAddress', '目标地址', required: true)
@@ -527,13 +527,13 @@ class MemoryAiOverlayToolDefinitions {
 
   static final cancelPointerScan = AiToolDefinition(
     name: 'cancel_pointer_scan',
-    description: '取消当前指针扫描任务',
+    description: '取消当前指针扫描（扫基址）任务',
     parameters: ToolParametersBuilder.empty(),
   );
 
   static final resetPointerScanSession = AiToolDefinition(
     name: 'reset_pointer_scan_session',
-    description: '重置当前指针扫描会话',
+    description: '重置当前指针扫描（扫基址）会话',
     parameters: ToolParametersBuilder.empty(),
   );
 

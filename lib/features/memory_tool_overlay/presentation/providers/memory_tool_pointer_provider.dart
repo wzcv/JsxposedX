@@ -272,6 +272,7 @@ class MemoryToolPointerController extends _$MemoryToolPointerController {
   Future<void> handleTaskCompleted() async {
     try {
       final sessionState = await ref.read(getPointerScanSessionStateProvider.future);
+      _ensureLayerForSession(sessionState, isLoadingInitial: false);
       await _refreshLayerForSession(sessionState);
     } catch (error) {
       final targetLayerIndex = _findActiveScanLayerIndex();
@@ -469,6 +470,16 @@ class MemoryToolPointerController extends _$MemoryToolPointerController {
     }
   }
 
+  void ensureSessionLayerVisible({
+    required PointerScanSessionState sessionState,
+    required bool isLoadingInitial,
+  }) {
+    _ensureLayerForSession(
+      sessionState,
+      isLoadingInitial: isLoadingInitial,
+    );
+  }
+
   void _applyAutoChaseState(PointerAutoChaseState autoChaseState) {
     final baseRequest = _autoChaseBaseRequest;
     if (baseRequest == null) {
@@ -597,6 +608,61 @@ class MemoryToolPointerController extends _$MemoryToolPointerController {
         hasMore: results.length < sessionState.resultCount,
         clearErrorText: true,
       ),
+    );
+  }
+
+  void _ensureLayerForSession(
+    PointerScanSessionState sessionState, {
+    required bool isLoadingInitial,
+  }) {
+    if (!sessionState.hasActiveSession) {
+      return;
+    }
+
+    final existingLayerIndex = _findLayerIndexBySession(sessionState);
+    if (existingLayerIndex >= 0) {
+      final existingLayer = state.layers[existingLayerIndex];
+      final nextHasMore = existingLayer.results.length < sessionState.resultCount;
+      if (existingLayer.totalResultCount == sessionState.resultCount &&
+          existingLayer.isLoadingInitial == isLoadingInitial &&
+          existingLayer.hasMore == nextHasMore &&
+          existingLayer.errorText == null) {
+        return;
+      }
+      _updateLayer(
+        existingLayerIndex,
+        existingLayer.copyWith(
+          totalResultCount: sessionState.resultCount,
+          isLoadingInitial: isLoadingInitial,
+          hasMore: nextHasMore,
+          clearErrorText: true,
+        ),
+      );
+      return;
+    }
+
+    state = MemoryToolPointerState(
+      layers: <PointerChainLayerState>[
+        PointerChainLayerState(
+          request: _buildRequestFromSession(sessionState),
+          totalResultCount: sessionState.resultCount,
+          isLoadingInitial: isLoadingInitial,
+          hasMore: sessionState.resultCount > 0,
+        ),
+      ],
+      currentLayerIndex: 0,
+    );
+  }
+
+  PointerScanRequest _buildRequestFromSession(PointerScanSessionState sessionState) {
+    return PointerScanRequest(
+      pid: sessionState.pid,
+      targetAddress: sessionState.targetAddress,
+      pointerWidth: sessionState.pointerWidth,
+      maxOffset: sessionState.maxOffset,
+      alignment: sessionState.alignment,
+      rangeSectionKeys: const <String>[],
+      scanAllReadableRegions: true,
     );
   }
 
