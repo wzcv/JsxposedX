@@ -663,6 +663,10 @@ class AiChatAction extends _$AiChatAction {
       config: config,
       recoveryMode: AiChatRecoveryMode.resumeToolPhase,
     );
+    _refreshCheckpoint(
+      protocolMessages: state.protocolMessages,
+      recoveryMode: AiChatRecoveryMode.resumeToolPhase,
+    );
 
     if (shouldHidePreToolDisplay) {
       _removeDisplayMessage(placeholderId);
@@ -728,6 +732,10 @@ class AiChatAction extends _$AiChatAction {
       _syncContextState(
         protocolMessages: nextProtocolMessages,
         config: config,
+        recoveryMode: AiChatRecoveryMode.resumeToolPhase,
+      );
+      _refreshCheckpoint(
+        protocolMessages: state.protocolMessages,
         recoveryMode: AiChatRecoveryMode.resumeToolPhase,
       );
 
@@ -2332,6 +2340,16 @@ class AiChatAction extends _$AiChatAction {
     return true;
   }
 
+  AiMessage? _findLastUserMessage(List<AiMessage> messages) {
+    for (var index = messages.length - 1; index >= 0; index--) {
+      final message = messages[index];
+      if (message.role == 'user') {
+        return message;
+      }
+    }
+    return null;
+  }
+
   AiChatToolExecutorContract? _getToolExecutor() {
     return state.toolExecutor;
   }
@@ -2607,6 +2625,39 @@ class AiChatAction extends _$AiChatAction {
     );
   }
 
+  void _refreshCheckpoint({
+    required List<AiMessage> protocolMessages,
+    required AiChatRecoveryMode recoveryMode,
+  }) {
+    final existingCheckpoint = state.sessionContext.checkpoint;
+    final lastUserMessage =
+        existingCheckpoint?.lastUserMessage ??
+        _findLastUserMessage(protocolMessages);
+    if (existingCheckpoint == null && lastUserMessage == null) {
+      return;
+    }
+
+    final nextCheckpoint =
+        (existingCheckpoint ??
+                AiChatCheckpoint(
+                  createdAtIso: DateTime.now().toIso8601String(),
+                  lastUserMessage: lastUserMessage,
+                ))
+            .copyWith(
+              createdAtIso: DateTime.now().toIso8601String(),
+              lastUserMessage: lastUserMessage,
+              protocolMessages: List<AiMessage>.unmodifiable(protocolMessages),
+              sessionMemorySnapshot: state.sessionContext.sessionMemory,
+              taskStateSnapshot: state.sessionContext.taskState,
+              toolTraceSnapshot: state.sessionContext.toolTrace,
+              recoveryMode: recoveryMode,
+            );
+
+    state = state.copyWith(
+      sessionContext: state.sessionContext.copyWith(checkpoint: nextCheckpoint),
+    );
+  }
+
   AiChatContextAssembly _buildPersistedContextAssembly({
     required List<AiMessage> protocolMessages,
     AiChatSessionContext? previousContext,
@@ -2628,6 +2679,7 @@ class AiChatAction extends _$AiChatAction {
     if (!shouldCompactStoredProtocol) {
       return assembly;
     }
+
 
     final compactedMessages = _compactProtocolMessages(sanitizedMessages);
     if (_sameMessages(sanitizedMessages, compactedMessages)) {

@@ -6,7 +6,10 @@ import 'package:JsxposedX/core/models/ai_message.dart';
 import 'package:JsxposedX/core/models/ai_session.dart';
 import 'package:JsxposedX/features/ai/data/datasources/chat/ai_chat_action_datasource.dart';
 import 'package:JsxposedX/features/ai/data/models/ai_message_dto.dart';
+import 'package:JsxposedX/features/ai/domain/contracts/ai_chat_tool_executor_contract.dart';
+import 'package:JsxposedX/features/ai/domain/models/ai_chat_environment_snapshot.dart';
 import 'package:JsxposedX/features/ai/domain/models/ai_chat_session_context.dart';
+import 'package:JsxposedX/features/ai/domain/models/ai_tool_call.dart';
 import 'package:JsxposedX/features/ai/domain/models/padi_chat_options.dart';
 import 'package:JsxposedX/features/ai/domain/repositories/chat/ai_chat_action_repository.dart';
 import 'package:JsxposedX/features/ai/domain/repositories/chat/ai_chat_query_repository.dart';
@@ -20,6 +23,7 @@ import 'package:JsxposedX/features/so_analysis/data/datasources/so_analysis_data
 import 'package:JsxposedX/features/so_analysis/presentation/providers/so_analysis_provider.dart';
 import 'package:JsxposedX/generated/apk_analysis.g.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:riverpod/riverpod.dart';
 
@@ -49,7 +53,7 @@ void main() {
       ];
 
       final fakeActionRepo = _FakeAiChatActionRepository(
-        queuedStreams: Queue<List<AiMessage>>.from([
+        queuedResponses: Queue<Object>.from([
           [
             AiMessage(
               id: 'reasoning-first',
@@ -160,7 +164,7 @@ void main() {
       ];
 
       final fakeActionRepo = _FakeAiChatActionRepository(
-        queuedStreams: Queue<List<AiMessage>>.from([
+        queuedResponses: Queue<Object>.from([
           [
             AiMessage(
               id: 'thinking-1',
@@ -231,6 +235,149 @@ void main() {
         fakeActionRepo.capturedRequests[1],
         reasoningContent: '先看看 VIP 相关类',
       );
+    },
+  );
+
+  test(
+    'retry after post-tool network failure resumes from checkpointed tool progress',
+    () async {
+      const toolCallId = 'call_search_100';
+      final retryableFailure = PlatformException(
+        code: 'connectionError',
+        message: 'HTTP 503: Service Unavailable',
+      );
+      final toolCall = <Map<String, dynamic>>[
+        {
+          'id': toolCallId,
+          'type': 'function',
+          'function': {
+            'name': 'start_first_scan',
+            'arguments': '{"valueType":"i32","matchMode":"exact","value":"100"}',
+          },
+        },
+      ];
+      final fakeActionRepo = _FakeAiChatActionRepository(
+        queuedResponses: Queue<Object>.from([
+          [AiMessage.assistantToolCalls(toolCall)],
+          retryableFailure,
+          retryableFailure,
+          retryableFailure,
+          retryableFailure,
+          retryableFailure,
+          retryableFailure,
+          [
+            AiMessage(
+              id: 'assistant-resumed',
+              role: 'assistant',
+              content: '已继续基于现有搜索结果处理，没有重新开始。',
+            ),
+          ],
+        ]),
+      );
+      final fakeToolExecutor = _FakeToolExecutor(
+        results: <String, AiToolResult>{
+          toolCallId: AiToolResult.ok(
+            toolCallId,
+            'start_first_scan',
+            '搜索会话仍存在，resultCount=13259',
+          ),
+        },
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          aiChatActionRepositoryProvider.overrideWithValue(fakeActionRepo),
+          aiChatQueryRepositoryProvider.overrideWithValue(
+            _FakeAiChatQueryRepository(),
+          ),
+          aiConfigQueryRepositoryProvider.overrideWithValue(
+            _FakeAiConfigQueryRepository(
+              const AiConfig(
+                id: 'test-retry',
+                name: 'OpenAI Retry',
+                apiKey: 'sk-test',
+                apiUrl: 'https://example.com/v1',
+                moduleName: 'gpt-5.4',
+                maxToken: 4096,
+                temperature: 1,
+                memoryRounds: 6,
+                apiType: AiApiType.openai,
+              ),
+            ),
+          ),
+          apkAnalysisQueryRepositoryProvider.overrideWithValue(
+            _FakeApkAnalysisQueryRepository(),
+          ),
+          soAnalysisDatasourceProvider.overrideWithValue(
+            _FakeSoAnalysisDatasource(),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(aiConfigProvider.future);
+      final provider = aiChatActionProvider(packageName: 'memory_overlay_test');
+      final sub = container.listen(provider, (_, __) {});
+      addTearDown(sub.close);
+      final notifier = container.read(provider.notifier);
+      notifier.applyEnvironmentSnapshot(
+        AiChatEnvironmentSnapshot.ready(
+          scopeId: 'memory',
+          environmentVersion: 'test',
+          systemPrompt: '你是测试助手',
+          toolExecutor: fakeToolExecutor,
+        ),
+      );
+
+      await notifier.send('先在内存中搜索100随便下个断点');
+      await _waitFor(
+        () =>
+            fakeActionRepo.capturedRequests.length >= 7 &&
+            !container.read(provider).isStreaming,
+      );
+
+      final failedState = container.read(provider);
+      expect(failedState.lastResponseIssue, isNotNull);
+      final checkpointMessages =
+          failedState.sessionContext.checkpoint?.protocolMessages ?? const [];
+      expect(
+        checkpointMessages.any(
+          (message) => message.role == 'assistant' && message.hasToolCalls,
+        ),
+        isTrue,
+      );
+      expect(
+        checkpointMessages.any(
+          (message) =>
+              message.role == 'tool' && message.toolCallId == toolCallId,
+        ),
+        isTrue,
+      );
+
+      await notifier.retryLastTurn();
+      await _waitFor(
+        () =>
+            fakeActionRepo.capturedRequests.length >= 8 &&
+            !container.read(provider).isStreaming,
+      );
+
+      final resumedRequest = fakeActionRepo.capturedRequests[7];
+      expect(
+        resumedRequest.any(
+          (message) => message.role == 'assistant' && message.hasToolCalls,
+        ),
+        isTrue,
+      );
+      expect(
+        resumedRequest.any(
+          (message) =>
+              message.role == 'tool' &&
+              message.toolCallId == toolCallId &&
+              message.content.contains('13259'),
+        ),
+        isTrue,
+      );
+      expect(fakeToolExecutor.executedCallIds, [toolCallId]);
     },
   );
 }
@@ -308,10 +455,10 @@ final class _FakeAiChatQueryRepository implements AiChatQueryRepository {
 }
 
 final class _FakeAiChatActionRepository implements AiChatActionRepository {
-  _FakeAiChatActionRepository({required Queue<List<AiMessage>> queuedStreams})
-    : _queuedStreams = queuedStreams;
+  _FakeAiChatActionRepository({required Queue<Object> queuedResponses})
+    : _queuedResponses = queuedResponses;
 
-  final Queue<List<AiMessage>> _queuedStreams;
+  final Queue<Object> _queuedResponses;
   final List<List<AiMessage>> capturedRequests = <List<AiMessage>>[];
 
   @override
@@ -323,10 +470,14 @@ final class _FakeAiChatActionRepository implements AiChatActionRepository {
     CancelToken? cancelToken,
   }) {
     capturedRequests.add(List<AiMessage>.from(messages));
-    if (_queuedStreams.isEmpty) {
+    if (_queuedResponses.isEmpty) {
       return const Stream<AiMessage>.empty();
     }
-    return Stream<AiMessage>.fromIterable(_queuedStreams.removeFirst());
+    final next = _queuedResponses.removeFirst();
+    if (next is List<AiMessage>) {
+      return Stream<AiMessage>.fromIterable(next);
+    }
+    return Stream<AiMessage>.error(next);
   }
 
   @override
@@ -370,6 +521,24 @@ final class _FakeAiChatActionRepository implements AiChatActionRepository {
 
   @override
   Future<void> deleteSession(String packageName, String sessionId) async {}
+}
+
+final class _FakeToolExecutor implements AiChatToolExecutorContract {
+  _FakeToolExecutor({required Map<String, AiToolResult> results})
+    : _results = results;
+
+  final Map<String, AiToolResult> _results;
+  final List<String> executedCallIds = <String>[];
+
+  @override
+  Future<AiToolResult> execute(
+    AiToolCall call, {
+    AiToolProgressCallback? onProgress,
+  }) async {
+    executedCallIds.add(call.id);
+    return _results[call.id] ??
+        AiToolResult.ok(call.id, call.name, 'ok: ${call.name}');
+  }
 }
 
 final class _FakeApkAnalysisQueryRepository
