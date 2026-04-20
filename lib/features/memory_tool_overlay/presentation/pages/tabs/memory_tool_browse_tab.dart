@@ -12,6 +12,7 @@ import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/me
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_instruction_history_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_pointer_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_saved_items_provider.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/utils/memory_tool_export_util.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/utils/memory_tool_pointer_utils.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/utils/memory_tool_search_result_presenter.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_browse_result_list.dart';
@@ -282,6 +283,44 @@ class MemoryToolBrowseTab extends HookConsumerWidget {
         );
       }
       await showSavedToast(resultList.length);
+    }
+
+    Future<void> exportSelectedResults(
+      List<MemoryToolDisplayItem> results,
+    ) async {
+      if (results.isEmpty) {
+        return;
+      }
+      await exportMemoryToolItemsToLocal(
+        context: context,
+        ref: ref,
+        sourceKey: 'browse',
+        pid: selectedProcess.pid,
+        items: results.map((result) {
+          final preview = resolvedPreviewMap[result.address];
+          final isInstruction = result.isInstruction;
+          final resolvedDisplayValue = isInstruction
+              ? result.effectiveDisplayValue
+              : (preview?.displayValue ?? result.displayValue);
+          return MemoryToolExportItem(
+            pid: selectedProcess.pid,
+            address: result.address,
+            regionStart: result.regionStart,
+            regionTypeKey: result.regionTypeKey,
+            valueType: preview?.type ?? result.type,
+            displayValue: resolvedDisplayValue,
+            rawBytes: preview?.rawBytes ?? result.rawBytes,
+            isFrozen: currentFrozenAddresses.contains(result.address),
+            isInstructionPatch: isInstruction,
+            instructionText: isInstruction ? result.effectiveDisplayValue : null,
+          );
+        }).toList(growable: false),
+        meta: <String, Object?>{
+          'anchor_address': browseState.anchorAddress == null
+              ? null
+              : formatMemoryToolSearchResultAddress(browseState.anchorAddress!),
+        },
+      );
     }
 
     Future<void> jumpToPointer(
@@ -615,6 +654,14 @@ class MemoryToolBrowseTab extends HookConsumerWidget {
                         ? null
                         : () async {
                             await saveResultsToSaved(selectedResults);
+                          },
+                  ),
+                  MemoryToolResultSelectionActionData(
+                    icon: Icons.file_download_outlined,
+                    onTap: selectedResults.isEmpty
+                        ? null
+                        : () async {
+                            await exportSelectedResults(selectedResults);
                           },
                   ),
                   MemoryToolResultSelectionActionData(

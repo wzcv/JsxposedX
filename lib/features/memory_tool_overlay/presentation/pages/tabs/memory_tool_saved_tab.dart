@@ -11,6 +11,7 @@ import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/me
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_pointer_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_saved_items_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_query_provider.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/utils/memory_tool_export_util.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/utils/memory_tool_pointer_utils.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_batch_edit_dialog.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_breakpoint_config_dialog.dart';
@@ -253,6 +254,38 @@ class MemoryToolSavedTab extends HookConsumerWidget {
     final resolvedSelectedItems = selectedItems
         .map(resolveSavedItem)
         .toList(growable: false);
+
+    Future<void> exportSelectedItemsToLocal() async {
+      if (resolvedSelectedItems.isEmpty) {
+        return;
+      }
+      await exportMemoryToolItemsToLocal(
+        context: context,
+        ref: ref,
+        sourceKey: 'saved',
+        pid: selectedPid,
+        items: resolvedSelectedItems.map((item) {
+          final resolvedDisplayValue = resolveSavedItemDisplayValue(item);
+          return MemoryToolExportItem(
+            pid: item.pid,
+            address: item.address,
+            regionStart: item.regionStart,
+            regionTypeKey: item.regionTypeKey,
+            valueType: item.type,
+            displayValue: resolvedDisplayValue,
+            rawBytes: resolveSavedItemRawBytes(item),
+            isFrozen: item.isInstructionPatch
+                ? false
+                : (currentFrozenAddresses?.contains(item.address) ??
+                      item.isFrozen),
+            isInstructionPatch: item.isInstructionPatch,
+            instructionText: item.isInstructionPatch
+                ? resolvedDisplayValue
+                : null,
+          );
+        }).toList(growable: false),
+      );
+    }
 
     Future<void> jumpToPointer(MemoryToolSavedItem item) async {
       final preview = previewMap[item.address];
@@ -601,6 +634,14 @@ class MemoryToolSavedTab extends HookConsumerWidget {
                             }
                           }
                         : null,
+                  ),
+                  MemoryToolResultSelectionActionData(
+                    icon: Icons.file_download_outlined,
+                    onTap: selectedItems.isEmpty
+                        ? null
+                        : () async {
+                            await exportSelectedItemsToLocal();
+                          },
                   ),
                   MemoryToolResultSelectionActionData(
                     icon: Icons.delete_sweep_rounded,

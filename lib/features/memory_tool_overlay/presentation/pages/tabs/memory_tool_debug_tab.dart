@@ -15,6 +15,7 @@ import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/me
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_pointer_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_saved_items_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/utils/memory_tool_debug_presenter.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/utils/memory_tool_export_util.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/utils/memory_tool_search_result_presenter.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_debug_instruction_editor_dialog.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_debug_primitives.dart';
@@ -369,6 +370,65 @@ class MemoryToolDebugTab extends HookConsumerWidget {
       await ToastOverlayMessage.show(
         context.l10n.memoryToolSavedToSavedMessage(1),
         duration: const Duration(milliseconds: 1200),
+      );
+    }
+
+    Future<void> exportCurrentDebugContext() async {
+      final breakpoint = selectedBreakpoint;
+      if (breakpoint == null) {
+        return;
+      }
+      final valueInfo = selectedValueInfo;
+      final hit = selectedHit;
+      final writerGroup = selectedWriterGroup;
+      await exportMemoryToolItemsToLocal(
+        context: context,
+        ref: ref,
+        sourceKey: 'debug',
+        pid: pid,
+        items: <MemoryToolExportItem>[
+          MemoryToolExportItem(
+            pid: pid,
+            address: breakpoint.address,
+            regionStart: valueInfo?.result.regionStart,
+            regionTypeKey: valueInfo?.result.regionTypeKey,
+            valueType: breakpoint.type,
+            displayValue: valueInfo?.displayValue,
+            rawBytes: valueInfo?.rawBytes,
+            extra: <String, Object?>{
+              'breakpoint_id': breakpoint.id,
+              'length': breakpoint.length,
+              'access_type': formatMemoryToolDebugAccessType(
+                context.l10n,
+                breakpoint.accessType,
+              ),
+              'enabled': breakpoint.enabled,
+              'pause_process_on_hit': breakpoint.pauseProcessOnHit,
+              'hit_count': breakpoint.hitCount,
+              'selected_writer_pc': writerGroup == null
+                  ? null
+                  : formatMemoryToolSearchResultAddress(writerGroup.pc),
+              'selected_writer_instruction': writerGroup?.instructionText,
+              'selected_writer_transition': writerGroup?.topTransition?.summary,
+              'selected_hit_thread_id': hit?.threadId,
+              'selected_hit_timestamp': hit == null
+                  ? null
+                  : formatMemoryToolDebugTimestamp(hit.timestampMillis),
+              'selected_hit_pc': hit == null
+                  ? null
+                  : formatMemoryToolSearchResultAddress(hit.pc),
+              'selected_hit_change': selectedHitChangeInfo?.displayText,
+            },
+          ),
+        ],
+        meta: <String, Object?>{
+          'is_process_paused': state?.isProcessPaused,
+          'active_breakpoint_count': state?.activeBreakpointCount,
+          'pending_hit_count': state?.pendingHitCount,
+          'architecture': state?.architecture,
+          'selected_breakpoint_hit_count': hits.length,
+          'writer_group_count': writerGroups.length,
+        },
       );
     }
 
@@ -1121,6 +1181,14 @@ class MemoryToolDebugTab extends HookConsumerWidget {
                                       memoryBreakpointActionProvider.notifier,
                                     )
                                     .clearMemoryBreakpointHits(pid: pid);
+                              },
+                      ),
+                      MemoryToolResultSelectionActionData(
+                        icon: Icons.file_download_outlined,
+                        onTap: selectedBreakpoint == null
+                            ? null
+                            : () async {
+                                await exportCurrentDebugContext();
                               },
                       ),
                     ],
