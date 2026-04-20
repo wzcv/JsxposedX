@@ -580,6 +580,7 @@ class _AiOverlayViewport extends HookConsumerWidget {
                                   ),
                                   AiChatInput(
                                     packageName: chatScopeId,
+                                    useOverlayFilePicker: true,
                                     showQuickActions: false,
                                     isEmbedded: true,
                                     isCompact: isCompactPanel,

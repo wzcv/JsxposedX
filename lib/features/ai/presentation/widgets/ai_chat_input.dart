@@ -1,5 +1,6 @@
 ﻿import 'package:JsxposedX/common/pages/toast.dart';
 import 'package:JsxposedX/common/widgets/app_bottom_sheet.dart';
+import 'dart:developer' as developer;
 import 'package:JsxposedX/core/extensions/context_extensions.dart';
 import 'package:JsxposedX/core/utils/file_picker_util.dart';
 import 'package:JsxposedX/features/ai/domain/constants/builtin_ai_config.dart';
@@ -15,10 +16,17 @@ import 'package:JsxposedX/features/ai/presentation/widgets/padi_chat_options_bar
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:hooks_riverpod/legacy.dart';
+
+final aiChatPendingAttachmentsProvider =
+    StateProvider.family<List<PickedFileData>, String>(
+      (ref, packageName) => const [],
+    );
 
 class AiChatInput extends HookConsumerWidget {
   final String packageName;
   final String? systemPrompt;
+  final bool useOverlayFilePicker;
   final bool showQuickActions;
   final bool isEmbedded;
   final bool isCompact;
@@ -31,6 +39,7 @@ class AiChatInput extends HookConsumerWidget {
     super.key,
     required this.packageName,
     this.systemPrompt,
+    this.useOverlayFilePicker = false,
     this.showQuickActions = true,
     this.isEmbedded = false,
     this.isCompact = false,
@@ -46,13 +55,18 @@ class AiChatInput extends HookConsumerWidget {
     final scopeScale = AiChatCompactScope.scaleOf(context);
     final effectiveCompact = isCompact || scopeCompact;
     final textController = useTextEditingController();
-    final pendingAttachments = useState<List<PickedFileData>>(const []);
+    final pendingAttachments = ref.watch(
+      aiChatPendingAttachmentsProvider(packageName),
+    );
+    final pendingAttachmentsNotifier = ref.read(
+      aiChatPendingAttachmentsProvider(packageName).notifier,
+    );
     final chatState = ref.watch(aiChatRuntimeProvider(packageName: packageName));
     final aiConfigAsync = ref.watch(aiConfigProvider);
 
     final textValue = useValueListenable(textController);
     final hasContent = textValue.text.trim().isNotEmpty;
-    final hasAttachments = pendingAttachments.value.isNotEmpty;
+    final hasAttachments = pendingAttachments.isNotEmpty;
     final isStreaming = chatState.isStreaming;
     final canSend = (hasContent || hasAttachments) && chatState.canSend;
     final hasContextDetails =
@@ -121,14 +135,20 @@ class AiChatInput extends HookConsumerWidget {
         try {
           final message = AiMultimodalMessageCodec.encodeFromPickedFiles(
             text: textController.text.trim(),
-            attachments: pendingAttachments.value,
+            attachments: pendingAttachments,
           );
 
           textController.clear();
-          pendingAttachments.value = const [];
+          pendingAttachmentsNotifier.state = const [];
 
           notifier.send(message); // Fire and forget
-        } catch (error) {
+        } catch (error, stackTrace) {
+          developer.log(
+            'Failed to encode pending attachments before send.',
+            name: 'AiChatInput',
+            error: error,
+            stackTrace: stackTrace,
+          );
           if (!context.mounted) {
             return;
           }
@@ -159,16 +179,32 @@ class AiChatInput extends HookConsumerWidget {
           break;
         case _AiInputMenuAction.uploadImage:
           try {
-            final picked = await FilePickerUtil.pickImage();
+            final picked = await FilePickerUtil.pickImage(
+              useOverlayProxy: useOverlayFilePicker,
+            );
             if (picked == null) {
+              developer.log(
+                'Image picker returned null.',
+                name: 'AiChatInput',
+              );
               return;
             }
             AiMultimodalMessageCodec.encodeFromPickedFiles(
               text: '',
               attachments: [picked],
             );
-            pendingAttachments.value = [...pendingAttachments.value, picked];
-          } catch (error) {
+            pendingAttachmentsNotifier.state = [...pendingAttachments, picked];
+            developer.log(
+              'Image attachment queued: ${picked.fileName}',
+              name: 'AiChatInput',
+            );
+          } catch (error, stackTrace) {
+            developer.log(
+              'Failed to pick image attachment.',
+              name: 'AiChatInput',
+              error: error,
+              stackTrace: stackTrace,
+            );
             if (!context.mounted) {
               return;
             }
@@ -177,16 +213,32 @@ class AiChatInput extends HookConsumerWidget {
           break;
         case _AiInputMenuAction.uploadFile:
           try {
-            final picked = await FilePickerUtil.pickFile();
+            final picked = await FilePickerUtil.pickFile(
+              useOverlayProxy: useOverlayFilePicker,
+            );
             if (picked == null) {
+              developer.log(
+                'File picker returned null.',
+                name: 'AiChatInput',
+              );
               return;
             }
             AiMultimodalMessageCodec.encodeFromPickedFiles(
               text: '',
               attachments: [picked],
             );
-            pendingAttachments.value = [...pendingAttachments.value, picked];
-          } catch (error) {
+            pendingAttachmentsNotifier.state = [...pendingAttachments, picked];
+            developer.log(
+              'File attachment queued: ${picked.fileName}',
+              name: 'AiChatInput',
+            );
+          } catch (error, stackTrace) {
+            developer.log(
+              'Failed to pick file attachment.',
+              name: 'AiChatInput',
+              error: error,
+              stackTrace: stackTrace,
+            );
             if (!context.mounted) {
               return;
             }
@@ -256,7 +308,7 @@ class AiChatInput extends HookConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (pendingAttachments.value.isNotEmpty)
+                  if (pendingAttachments.isNotEmpty)
                     Padding(
                       padding: EdgeInsets.fromLTRB(
                         isEmbedded ? 0 : 8 * scopeScale,
@@ -274,19 +326,17 @@ class AiChatInput extends HookConsumerWidget {
                           children: [
                             for (
                               var index = 0;
-                              index < pendingAttachments.value.length;
+                              index < pendingAttachments.length;
                               index++
                             )
                               _PendingAttachmentChip(
-                                file: pendingAttachments.value[index],
+                                file: pendingAttachments[index],
                                 onRemove: () {
                                   final updated = List<PickedFileData>.from(
-                                    pendingAttachments.value,
+                                    pendingAttachments,
                                   )..removeAt(index);
-                                  pendingAttachments.value =
-                                      List<PickedFileData>.unmodifiable(
-                                        updated,
-                                      );
+                                  pendingAttachmentsNotifier.state =
+                                      List<PickedFileData>.unmodifiable(updated);
                                 },
                               ),
                           ],
