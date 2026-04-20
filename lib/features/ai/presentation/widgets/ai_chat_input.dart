@@ -1,4 +1,4 @@
-import 'package:JsxposedX/common/pages/toast.dart';
+﻿import 'package:JsxposedX/common/pages/toast.dart';
 import 'package:JsxposedX/common/widgets/app_bottom_sheet.dart';
 import 'package:JsxposedX/core/extensions/context_extensions.dart';
 import 'package:JsxposedX/core/utils/file_picker_util.dart';
@@ -9,11 +9,11 @@ import 'package:JsxposedX/features/ai/domain/services/ai_multimodal_message_code
 import 'package:JsxposedX/features/ai/presentation/providers/config/ai_config_query_provider.dart';
 import 'package:JsxposedX/features/ai/presentation/providers/runtime/ai_chat_runtime_provider.dart';
 import 'package:JsxposedX/features/ai/presentation/states/ai_chat_runtime_state.dart';
+import 'package:JsxposedX/features/ai/presentation/widgets/ai_chat_compact_scope.dart';
 import 'package:JsxposedX/features/ai/presentation/widgets/ai_quick_actions.dart';
 import 'package:JsxposedX/features/ai/presentation/widgets/padi_chat_options_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class AiChatInput extends HookConsumerWidget {
@@ -21,6 +21,9 @@ class AiChatInput extends HookConsumerWidget {
   final String? systemPrompt;
   final bool showQuickActions;
   final bool isEmbedded;
+  final bool isCompact;
+  final bool showBuiltinOptions;
+  final bool builtinOptionsCompact;
   final Future<void> Function()? onRetryInitialization;
   final VoidCallback? onOpenAnalysis;
 
@@ -30,12 +33,18 @@ class AiChatInput extends HookConsumerWidget {
     this.systemPrompt,
     this.showQuickActions = true,
     this.isEmbedded = false,
+    this.isCompact = false,
+    this.showBuiltinOptions = true,
+    this.builtinOptionsCompact = false,
     this.onRetryInitialization,
     this.onOpenAnalysis,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final scopeCompact = AiChatCompactScope.of(context);
+    final scopeScale = AiChatCompactScope.scaleOf(context);
+    final effectiveCompact = isCompact || scopeCompact;
     final textController = useTextEditingController();
     final pendingAttachments = useState<List<PickedFileData>>(const []);
     final chatState = ref.watch(aiChatRuntimeProvider(packageName: packageName));
@@ -88,6 +97,17 @@ class AiChatInput extends HookConsumerWidget {
         : canRetryInitialization
         ? context.l10n.aiRetryInitialization
         : context.l10n.aiUnavailableToSend;
+    final menuButtonSize = (effectiveCompact ? 30 : 36) * scopeScale;
+    final menuIconSize = (effectiveCompact ? 17 : 20) * scopeScale;
+    final horizontalGap = isEmbedded
+        ? ((effectiveCompact ? 6 : 10) * scopeScale)
+        : ((effectiveCompact ? 10 : 14) * scopeScale);
+    final inputVerticalPadding = (effectiveCompact ? 6 : 10) * scopeScale;
+    final inputFontSize = (effectiveCompact ? 13 : 15) * scopeScale;
+    final actionButtonSize = (effectiveCompact ? 36 : 44) * scopeScale;
+    final actionIconSize = (effectiveCompact ? 18 : 22) * scopeScale;
+    final sendButtonMargin = (effectiveCompact ? 6 : 8) * scopeScale;
+    final maxInputLines = effectiveCompact ? 3 : 5;
 
     Future<void> handleSend() async {
       final notifier = ref.read(
@@ -185,16 +205,25 @@ class AiChatInput extends HookConsumerWidget {
             systemPrompt: systemPrompt,
             onOpenAnalysis: onOpenAnalysis,
           ),
-        if (aiConfigAsync.value != null &&
+        if (showBuiltinOptions &&
+            aiConfigAsync.value != null &&
             shouldUseBuiltinPadiOptions(aiConfigAsync.value!))
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.w),
-            child: PadiChatOptionsBar(packageName: packageName),
+            padding: EdgeInsets.symmetric(horizontal: 16 * scopeScale),
+            child: PadiChatOptionsBar(
+              packageName: packageName,
+              isCompact: builtinOptionsCompact,
+            ),
           ),
         Container(
           padding: isEmbedded
               ? EdgeInsets.zero
-              : EdgeInsets.fromLTRB(16.w, 4.h, 16.w, 20.h),
+              : EdgeInsets.fromLTRB(
+                  16 * scopeScale,
+                  4 * scopeScale,
+                  16 * scopeScale,
+                  20 * scopeScale,
+                ),
           decoration: BoxDecoration(
             color: isEmbedded
                 ? Colors.transparent
@@ -209,7 +238,9 @@ class AiChatInput extends HookConsumerWidget {
                   : (context.isDark
                         ? context.colorScheme.surfaceContainerLow
                         : Colors.white),
-              borderRadius: BorderRadius.circular(isEmbedded ? 0 : 12.r),
+              borderRadius: BorderRadius.circular(
+                isEmbedded ? 0 : 12 * scopeScale,
+              ),
               boxShadow: isEmbedded
                   ? const []
                   : [
@@ -221,23 +252,25 @@ class AiChatInput extends HookConsumerWidget {
                     ],
             ),
             child: Padding(
-              padding: EdgeInsets.all(isEmbedded ? 0 : 4.w),
+              padding: EdgeInsets.all(isEmbedded ? 0 : 4 * scopeScale),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (pendingAttachments.value.isNotEmpty)
                     Padding(
                       padding: EdgeInsets.fromLTRB(
-                        isEmbedded ? 0 : 8.w,
-                        isEmbedded ? 0 : 8.h,
-                        isEmbedded ? 0 : 8.w,
-                        isEmbedded ? 8.h : 2.h,
+                        isEmbedded ? 0 : 8 * scopeScale,
+                        isEmbedded ? 0 : 8 * scopeScale,
+                        isEmbedded ? 0 : 8 * scopeScale,
+                        isEmbedded
+                            ? 8 * scopeScale
+                            : 2 * scopeScale,
                       ),
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: Wrap(
-                          spacing: 6.w,
-                          runSpacing: 6.h,
+                          spacing: 6 * scopeScale,
+                          runSpacing: 6 * scopeScale,
                           children: [
                             for (
                               var index = 0;
@@ -262,13 +295,13 @@ class AiChatInput extends HookConsumerWidget {
                     ),
                   Container(
                     padding: isEmbedded
-                        ? EdgeInsets.fromLTRB(0, 0, 0, 2.h)
+                        ? EdgeInsets.fromLTRB(0, 0, 0, 2 * scopeScale)
                         : EdgeInsets.zero,
                     decoration: BoxDecoration(
                       color: isEmbedded
                           ? Colors.transparent
                           : null,
-                      borderRadius: BorderRadius.circular(12.r),
+                      borderRadius: BorderRadius.circular(12 * scopeScale),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -278,7 +311,9 @@ class AiChatInput extends HookConsumerWidget {
                           offset: const Offset(0, -180),
                           color: context.theme.cardColor,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14.r),
+                            borderRadius: BorderRadius.circular(
+                              14 * scopeScale,
+                            ),
                           ),
                           onSelected: handleMenuAction,
                           itemBuilder: (context) => [
@@ -315,14 +350,18 @@ class AiChatInput extends HookConsumerWidget {
                             ),
                           ],
                           child: Container(
-                            width: 36.w,
-                            height: 36.w,
-                            margin: EdgeInsets.only(left: isEmbedded ? 0 : 6.w),
+                            width: menuButtonSize,
+                            height: menuButtonSize,
+                            margin: EdgeInsets.only(
+                              left: isEmbedded ? 0 : 6 * scopeScale,
+                            ),
                             decoration: BoxDecoration(
                               color: context.isDark
                                   ? context.colorScheme.surfaceContainerLow
                                   : context.colorScheme.surface,
-                              borderRadius: BorderRadius.circular(10.r),
+                              borderRadius: BorderRadius.circular(
+                                10 * scopeScale,
+                              ),
                               border: Border.all(
                                 color: context.colorScheme.outlineVariant
                                     .withValues(
@@ -332,15 +371,17 @@ class AiChatInput extends HookConsumerWidget {
                             ),
                             child: Icon(
                               Icons.add_rounded,
-                              size: 20.sp,
+                              size: menuIconSize,
                               color: context.colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ),
-                        SizedBox(width: isEmbedded ? 10.w : 14.w),
+                        SizedBox(width: horizontalGap),
                         Expanded(
                           child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 10.h),
+                            padding: EdgeInsets.symmetric(
+                              vertical: inputVerticalPadding,
+                            ),
                             child: TextField(
                               controller: textController,
                               enabled:
@@ -353,7 +394,7 @@ class AiChatInput extends HookConsumerWidget {
                                 await handleSend();
                               },
                               style: TextStyle(
-                                fontSize: 15.sp,
+                                fontSize: inputFontSize,
                                 height: 1.4,
                                 color: context.textTheme.bodyLarge?.color,
                               ),
@@ -369,10 +410,10 @@ class AiChatInput extends HookConsumerWidget {
                                 contentPadding: EdgeInsets.zero,
                                 hintStyle: TextStyle(
                                   color: context.theme.hintColor,
-                                  fontSize: 15.sp,
+                                  fontSize: inputFontSize,
                                 ),
                               ),
-                              maxLines: 5,
+                              maxLines: maxInputLines,
                               minLines: 1,
                             ),
                           ),
@@ -380,9 +421,9 @@ class AiChatInput extends HookConsumerWidget {
                         GestureDetector(
                           onTap: handleSend,
                           child: Container(
-                            width: 44.w,
-                            height: 44.w,
-                            margin: EdgeInsets.only(left: 8.w),
+                            width: actionButtonSize,
+                            height: actionButtonSize,
+                            margin: EdgeInsets.only(left: sendButtonMargin),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: actionColor,
@@ -392,7 +433,7 @@ class AiChatInput extends HookConsumerWidget {
                               child: Icon(
                                 actionIcon,
                                 color: Colors.white,
-                                size: 22.sp,
+                                size: actionIconSize,
                               ),
                             ),
                           ),
@@ -433,21 +474,26 @@ class _AiInputMenuItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scopeScale = AiChatCompactScope.scaleOf(context);
     return SizedBox(
-      width: 210.w,
+      width: 210 * scopeScale,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 30.w,
-            height: 30.w,
+            width: 30 * scopeScale,
+            height: 30 * scopeScale,
             decoration: BoxDecoration(
               color: context.colorScheme.primary.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(9.r),
+              borderRadius: BorderRadius.circular(9 * scopeScale),
             ),
-            child: Icon(icon, size: 16.sp, color: context.colorScheme.primary),
+            child: Icon(
+              icon,
+              size: 16 * scopeScale,
+              color: context.colorScheme.primary,
+            ),
           ),
-          SizedBox(width: 10.w),
+          SizedBox(width: 10 * scopeScale),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -456,15 +502,15 @@ class _AiInputMenuItem extends StatelessWidget {
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 13.sp,
+                    fontSize: 13 * scopeScale,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                SizedBox(height: 2.h),
+                SizedBox(height: 2 * scopeScale),
                 Text(
                   subtitle,
                   style: TextStyle(
-                    fontSize: 11.5.sp,
+                    fontSize: 11.5 * scopeScale,
                     height: 1.35,
                     color: context.colorScheme.onSurfaceVariant,
                   ),
@@ -486,6 +532,7 @@ class _PendingAttachmentChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scopeScale = AiChatCompactScope.scaleOf(context);
     final extension = (file.extension ?? '').toLowerCase();
     final isImage = const {
       'png',
@@ -498,13 +545,16 @@ class _PendingAttachmentChip extends StatelessWidget {
     }.contains(extension);
 
     return Container(
-      constraints: BoxConstraints(maxWidth: 0.62.sw),
-      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 7.h),
+      constraints: BoxConstraints(maxWidth: 220 * scopeScale),
+      padding: EdgeInsets.symmetric(
+        horizontal: 10 * scopeScale,
+        vertical: 7 * scopeScale,
+      ),
       decoration: BoxDecoration(
         color: context.colorScheme.surfaceContainerHighest.withValues(
           alpha: context.isDark ? 0.55 : 0.75,
         ),
-        borderRadius: BorderRadius.circular(999.r),
+        borderRadius: BorderRadius.circular(999 * scopeScale),
         border: Border.all(
           color: context.colorScheme.outlineVariant.withValues(alpha: 0.7),
         ),
@@ -514,27 +564,27 @@ class _PendingAttachmentChip extends StatelessWidget {
         children: [
           Icon(
             isImage ? Icons.image_outlined : Icons.attach_file_rounded,
-            size: 14.sp,
+            size: 14 * scopeScale,
             color: context.colorScheme.onSurfaceVariant,
           ),
-          SizedBox(width: 6.w),
+          SizedBox(width: 6 * scopeScale),
           Flexible(
             child: Text(
               '${file.fileName} · ${file.formattedSize}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 11.5.sp,
+                fontSize: 11.5 * scopeScale,
                 color: context.colorScheme.onSurface,
               ),
             ),
           ),
-          SizedBox(width: 6.w),
+          SizedBox(width: 6 * scopeScale),
           GestureDetector(
             onTap: onRemove,
             child: Icon(
               Icons.close_rounded,
-              size: 14.sp,
+              size: 14 * scopeScale,
               color: context.colorScheme.onSurfaceVariant,
             ),
           ),
@@ -551,6 +601,7 @@ class _ContextSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scopeScale = AiChatCompactScope.scaleOf(context);
     final sessionContext = chatState.sessionContext;
     final stats = chatState.contextStats;
     final checkpoint = sessionContext.checkpoint;
@@ -559,7 +610,12 @@ class _ContextSheet extends StatelessWidget {
 
     return SafeArea(
       child: Padding(
-        padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.h),
+        padding: EdgeInsets.fromLTRB(
+          16 * scopeScale,
+          0,
+          16 * scopeScale,
+          16 * scopeScale,
+        ),
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -580,7 +636,7 @@ class _ContextSheet extends StatelessWidget {
                       '${sessionContext.hasPendingToolPhase ? context.l10n.aiContextToolTracePending : context.l10n.aiContextToolTraceClear}',
                 ],
               ),
-              SizedBox(height: 10.h),
+              SizedBox(height: 10 * scopeScale),
               _ContextInfoCard(
                 title: context.l10n.aiContextMemory,
                 rows: [
@@ -593,7 +649,7 @@ class _ContextSheet extends StatelessWidget {
                   '${context.l10n.aiContextTaskNext}: ${sessionContext.taskState.nextStep ?? context.l10n.aiSummaryEmpty}',
                 ],
               ),
-              SizedBox(height: 10.h),
+              SizedBox(height: 10 * scopeScale),
               _ContextInfoCard(
                 title: context.l10n.aiContextCheckpoint,
                 rows: checkpoint == null
@@ -604,7 +660,7 @@ class _ContextSheet extends StatelessWidget {
                         '${context.l10n.aiContextCheckpointMode}: ${_localizedRecoveryMode(context, lastRecoveryMode)}',
                       ],
               ),
-              SizedBox(height: 10.h),
+              SizedBox(height: 10 * scopeScale),
               _ContextInfoCard(
                 title: context.l10n.aiContextLastError,
                 rows: [
@@ -658,12 +714,13 @@ class _ContextInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scopeScale = AiChatCompactScope.scaleOf(context);
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(12.w),
+      padding: EdgeInsets.all(12 * scopeScale),
       decoration: BoxDecoration(
         color: context.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14.r),
+        borderRadius: BorderRadius.circular(14 * scopeScale),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -671,34 +728,37 @@ class _ContextInfoCard extends StatelessWidget {
           Text(
             title,
             style: TextStyle(
-              fontSize: 13.sp,
+              fontSize: 13 * scopeScale,
               fontWeight: FontWeight.w700,
               color: context.colorScheme.primary,
             ),
           ),
-          SizedBox(height: 8.h),
+          SizedBox(height: 8 * scopeScale),
           for (final item in rows)
             Padding(
-              padding: EdgeInsets.only(bottom: 6.h),
+              padding: EdgeInsets.only(bottom: 6 * scopeScale),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
-                    padding: EdgeInsets.only(top: 6.h),
+                    padding: EdgeInsets.only(top: 6 * scopeScale),
                     child: Container(
-                      width: 4.w,
-                      height: 4.w,
+                      width: 4 * scopeScale,
+                      height: 4 * scopeScale,
                       decoration: BoxDecoration(
                         color: context.colorScheme.primary,
                         shape: BoxShape.circle,
                       ),
                     ),
                   ),
-                  SizedBox(width: 8.w),
+                  SizedBox(width: 8 * scopeScale),
                   Expanded(
                     child: Text(
                       item,
-                      style: TextStyle(fontSize: 13.sp, height: 1.45),
+                      style: TextStyle(
+                        fontSize: 13 * scopeScale,
+                        height: 1.45,
+                      ),
                     ),
                   ),
                 ],

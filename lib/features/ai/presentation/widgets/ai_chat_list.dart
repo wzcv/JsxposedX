@@ -1,13 +1,13 @@
-import 'dart:math' as math;
+﻿import 'dart:math' as math;
 
 import 'package:JsxposedX/core/extensions/context_extensions.dart';
 import 'package:JsxposedX/core/models/ai_message.dart';
 import 'package:JsxposedX/features/ai/domain/models/ai_response_issue.dart';
 import 'package:JsxposedX/features/ai/presentation/providers/runtime/ai_chat_runtime_provider.dart';
 import 'package:JsxposedX/features/ai/presentation/widgets/ai_chat_bubble/ai_chat_bubble.dart';
+import 'package:JsxposedX/features/ai/presentation/widgets/ai_chat_compact_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class AiChatList extends HookConsumerWidget {
@@ -16,6 +16,7 @@ class AiChatList extends HookConsumerWidget {
     required this.messages,
     required this.scrollController,
     required this.packageName,
+    this.isCompact = false,
     this.systemPrompt,
     this.customTitle,
     this.customSubtitle,
@@ -24,23 +25,31 @@ class AiChatList extends HookConsumerWidget {
   final List<AiMessage> messages;
   final ScrollController scrollController;
   final String packageName;
+  final bool isCompact;
   final String? systemPrompt;
   final String? customTitle;
   final String? customSubtitle;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final scopeCompact = AiChatCompactScope.of(context);
+    final scopeScale = AiChatCompactScope.scaleOf(context);
+    final effectiveCompact = isCompact || scopeCompact;
     if (messages.isEmpty) {
       return LayoutBuilder(
         builder: (context, constraints) {
-          final isCompact = constraints.maxHeight < 220.h;
-          final horizontalPadding = 20.w;
-          final topPadding = isCompact ? 10.h : 18.h;
-          final bottomPadding = 12.h;
+          final isCompactLayout =
+              effectiveCompact || constraints.maxHeight < (220 * scopeScale);
+          final horizontalPadding =
+              (effectiveCompact ? 12 : 20) * scopeScale;
+          final topPadding = (isCompactLayout ? 10 : 18) * scopeScale;
+          final bottomPadding = 12 * scopeScale;
           final bubbleMaxWidth = math.max(
             0.0,
-            constraints.maxWidth - (horizontalPadding * 2) - 22.w,
-          );
+            constraints.maxWidth -
+                (horizontalPadding * 2) -
+                (22 * scopeScale),
+          ).toDouble();
 
           return SingleChildScrollView(
             controller: scrollController,
@@ -58,11 +67,14 @@ class AiChatList extends HookConsumerWidget {
                 ),
               ),
               child: Align(
-                alignment: isCompact ? Alignment.topLeft : Alignment.centerLeft,
+                alignment: isCompactLayout
+                    ? Alignment.topLeft
+                    : Alignment.centerLeft,
                 child: _EmptyChatState(
                   title: customTitle ?? context.l10n.aiAssistantTitle,
                   subtitle: customSubtitle ?? context.l10n.aiAssistantSubtitle,
                   maxBubbleWidth: bubbleMaxWidth,
+                  isCompact: isCompactLayout,
                 ),
               ),
             ),
@@ -88,7 +100,10 @@ class AiChatList extends HookConsumerWidget {
     return ListView.builder(
       controller: scrollController,
       reverse: true,
-      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
+      padding: EdgeInsets.symmetric(
+        horizontal: (effectiveCompact ? 12 : 20) * scopeScale,
+        vertical: (effectiveCompact ? 6 : 10) * scopeScale,
+      ),
       itemCount: reversedMessages.length + (hasMore ? 1 : 0),
       cacheExtent: 500,
       addAutomaticKeepAlives: false,
@@ -96,7 +111,7 @@ class AiChatList extends HookConsumerWidget {
       itemBuilder: (context, index) {
         if (index == reversedMessages.length) {
           return Padding(
-            padding: EdgeInsets.symmetric(vertical: 8.h),
+            padding: EdgeInsets.symmetric(vertical: 8 * scopeScale),
             child: TextButton(
               onPressed: chatNotifier.loadMore,
               child: Text(
@@ -153,14 +168,17 @@ class _EmptyChatState extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.maxBubbleWidth,
+    required this.isCompact,
   });
 
   final String title;
   final String subtitle;
   final double maxBubbleWidth;
+  final bool isCompact;
 
   @override
   Widget build(BuildContext context) {
+    final scopeScale = AiChatCompactScope.scaleOf(context);
     final promptHints = context.isZh
         ? const [
             '描述一下你现在想解决的问题',
@@ -181,49 +199,54 @@ class _EmptyChatState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 28.w,
-              height: 28.w,
+              width: (isCompact ? 24 : 28) * scopeScale,
+              height: (isCompact ? 24 : 28) * scopeScale,
               decoration: BoxDecoration(
                 color: context.colorScheme.primary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.auto_awesome_rounded,
-                size: 16.sp,
+                size: (isCompact ? 14 : 16) * scopeScale,
                 color: context.colorScheme.primary,
               ),
             ),
-            SizedBox(width: 8.w),
+            SizedBox(width: 8 * scopeScale),
             Text(
               context.isZh ? '助手' : 'Assistant',
               style: TextStyle(
-                fontSize: 12.sp,
+                fontSize: (isCompact ? 11 : 12) * scopeScale,
                 fontWeight: FontWeight.w700,
                 color: context.colorScheme.onSurface,
               ),
             ),
           ],
         ),
-        SizedBox(height: 10.h),
+        SizedBox(height: (isCompact ? 8 : 10) * scopeScale),
         ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxBubbleWidth),
           child: Container(
-            padding: EdgeInsets.fromLTRB(16.w, 14.h, 16.w, 14.h),
+            padding: EdgeInsets.fromLTRB(
+              (isCompact ? 12 : 16) * scopeScale,
+              (isCompact ? 10 : 14) * scopeScale,
+              (isCompact ? 12 : 16) * scopeScale,
+              (isCompact ? 10 : 14) * scopeScale,
+            ),
             decoration: BoxDecoration(
               color: context.isDark
                   ? context.colorScheme.surfaceContainer
                   : Colors.white,
               borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(20.r),
-                topRight: Radius.circular(20.r),
-                bottomLeft: Radius.circular(6.r),
-                bottomRight: Radius.circular(20.r),
+                topLeft: Radius.circular(20 * scopeScale),
+                topRight: Radius.circular(20 * scopeScale),
+                bottomLeft: Radius.circular(6 * scopeScale),
+                bottomRight: Radius.circular(20 * scopeScale),
               ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 12.r,
-                  offset: Offset(0, 4.h),
+                  blurRadius: 12 * scopeScale,
+                  offset: Offset(0, 4 * scopeScale),
                 ),
               ],
             ),
@@ -234,27 +257,27 @@ class _EmptyChatState extends StatelessWidget {
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 15.sp,
+                    fontSize: (isCompact ? 13 : 15) * scopeScale,
                     fontWeight: FontWeight.w700,
                     color: context.colorScheme.onSurface,
                   ),
                 ),
-                SizedBox(height: 6.h),
+                SizedBox(height: (isCompact ? 4 : 6) * scopeScale),
                 Text(
                   subtitle,
                   style: TextStyle(
-                    fontSize: 12.5.sp,
+                    fontSize: (isCompact ? 11 : 12.5) * scopeScale,
                     height: 1.45,
                     color: context.colorScheme.onSurfaceVariant,
                   ),
                 ),
-                SizedBox(height: 10.h),
+                SizedBox(height: (isCompact ? 8 : 10) * scopeScale),
                 Text(
                   context.isZh
                       ? '直接输入目标、现象或假设，我会按当前环境继续对话。'
                       : 'Describe your goal, symptom, or hypothesis and I will continue from the current environment.',
                   style: TextStyle(
-                    fontSize: 12.5.sp,
+                    fontSize: (isCompact ? 11 : 12.5) * scopeScale,
                     height: 1.5,
                     color: context.colorScheme.onSurface.withValues(alpha: 0.86),
                   ),
@@ -263,12 +286,13 @@ class _EmptyChatState extends StatelessWidget {
             ),
           ),
         ),
-        SizedBox(height: 12.h),
+        SizedBox(height: (isCompact ? 8 : 12) * scopeScale),
         Wrap(
-          spacing: 8.w,
-          runSpacing: 8.h,
+          spacing: (isCompact ? 6 : 8) * scopeScale,
+          runSpacing: (isCompact ? 6 : 8) * scopeScale,
           children: [
-            for (final hint in promptHints) _EmptyPromptChip(label: hint),
+            for (final hint in promptHints)
+              _EmptyPromptChip(label: hint, isCompact: isCompact),
           ],
         ),
       ],
@@ -277,19 +301,26 @@ class _EmptyChatState extends StatelessWidget {
 }
 
 class _EmptyPromptChip extends StatelessWidget {
-  const _EmptyPromptChip({required this.label});
+  const _EmptyPromptChip({required this.label, required this.isCompact});
 
   final String label;
+  final bool isCompact;
 
   @override
   Widget build(BuildContext context) {
+    final scopeScale = AiChatCompactScope.scaleOf(context);
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 7.h),
+      padding: EdgeInsets.symmetric(
+        horizontal: (isCompact ? 8 : 10) * scopeScale,
+        vertical: (isCompact ? 5 : 7) * scopeScale,
+      ),
       decoration: BoxDecoration(
         color: context.colorScheme.surfaceContainerHighest.withValues(
           alpha: context.isDark ? 0.4 : 0.72,
         ),
-        borderRadius: BorderRadius.circular(14.r),
+        borderRadius: BorderRadius.circular(
+          (isCompact ? 12 : 14) * scopeScale,
+        ),
         border: Border.all(
           color: context.colorScheme.outlineVariant.withValues(alpha: 0.72),
         ),
@@ -297,7 +328,7 @@ class _EmptyPromptChip extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          fontSize: 11.5.sp,
+          fontSize: (isCompact ? 10.5 : 11.5) * scopeScale,
           height: 1.35,
           color: context.colorScheme.onSurfaceVariant,
         ),

@@ -437,7 +437,11 @@ class _MemoryToolPseudocodeBubbleContainerPart
   const _MemoryToolPseudocodeBubbleContainerPart();
 
   @override
-  EdgeInsetsGeometry resolveBubbleMargin(BubbleState state) {
+  EdgeInsetsGeometry resolveBubbleMargin(
+    BubbleState state, {
+    required bool isCompact,
+    required double scale,
+  }) {
     return EdgeInsets.zero;
   }
 }

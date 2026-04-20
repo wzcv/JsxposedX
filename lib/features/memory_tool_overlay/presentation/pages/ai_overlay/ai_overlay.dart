@@ -1,4 +1,4 @@
-import 'dart:math' as math;
+﻿import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:JsxposedX/core/extensions/context_extensions.dart';
@@ -6,6 +6,7 @@ import 'package:JsxposedX/features/ai/domain/models/ai_session_init_state.dart';
 import 'package:JsxposedX/features/ai/presentation/providers/runtime/ai_chat_runtime_provider.dart';
 import 'package:JsxposedX/features/ai/presentation/runtime/ai_chat_environment_initializer.dart';
 import 'package:JsxposedX/features/ai/presentation/states/ai_chat_runtime_state.dart';
+import 'package:JsxposedX/features/ai/presentation/widgets/ai_chat_compact_scope.dart';
 import 'package:JsxposedX/features/ai/presentation/widgets/ai_chat_input.dart';
 import 'package:JsxposedX/features/ai/presentation/widgets/ai_chat_list.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/ai_overlay_ui_state_provider.dart';
@@ -16,7 +17,6 @@ import 'package:JsxposedX/features/overlay_window/presentation/providers/overlay
 import 'package:JsxposedX/generated/memory_tool.g.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class AiOverlay extends HookConsumerWidget {
@@ -98,14 +98,14 @@ class _AiOverlayViewport extends HookConsumerWidget {
       aiChatRuntimeProvider(packageName: chatScopeId),
     );
     final scrollController = useScrollController();
-    final collapsedDiameter = 44.r;
-    final defaultExpandedSize = Size(320.r, 420.r);
-    final minExpandedSize = Size(260.r, 280.r);
-    final safePadding = 12.r;
-    final expandedBorderRadius = 20.r;
-    final collapsedBorderRadius = 14.r;
-    final resizeHandleHighlightExtent = 40.r;
-    final resizeHandleHitExtent = 52.r;
+    final collapsedDiameter = 44.0;
+    final defaultExpandedSize = const Size(320.0, 420.0);
+    final minExpandedSize = const Size(260.0, 280.0);
+    final safePadding = 12.0;
+    final expandedBorderRadius = 20.0;
+    final collapsedBorderRadius = 14.0;
+    final resizeHandleHighlightExtent = 40.0;
+    final resizeHandleHitExtent = 52.0;
     final displayTitle = selectedProcess.name.trim().isEmpty
         ? selectedProcess.packageName
         : selectedProcess.name;
@@ -139,11 +139,13 @@ class _AiOverlayViewport extends HookConsumerWidget {
 
     Size clampExpandedSize(Size size) {
       return Size(
-        size.width.clamp(effectiveMinExpandedWidth, availableExpandedWidth),
+        size.width
+            .clamp(effectiveMinExpandedWidth, availableExpandedWidth)
+            .toDouble(),
         size.height.clamp(
           effectiveMinExpandedHeight,
           availableExpandedHeight,
-        ),
+        ).toDouble(),
       );
     }
 
@@ -156,8 +158,8 @@ class _AiOverlayViewport extends HookConsumerWidget {
         : Size(collapsedDiameter, collapsedDiameter);
 
     Offset defaultOffset(Size size) => Offset(
-      viewportSize.width - size.width - 20.r,
-      portraitTopInset + 88.r,
+      viewportSize.width - size.width - 20.0,
+      portraitTopInset + 88.0,
     );
 
     Offset clampOffset(Offset value, Size size) {
@@ -171,7 +173,10 @@ class _AiOverlayViewport extends HookConsumerWidget {
         minY,
         viewportSize.height - size.height - safePadding,
       );
-      return Offset(value.dx.clamp(minX, maxX), value.dy.clamp(minY, maxY));
+      return Offset(
+        value.dx.clamp(minX, maxX).toDouble(),
+        value.dy.clamp(minY, maxY).toDouble(),
+      );
     }
 
     useEffect(() {
@@ -297,8 +302,37 @@ class _AiOverlayViewport extends HookConsumerWidget {
     );
     final showExpandedPanel =
         isExpanded &&
-        resolvedSize.width > (collapsedDiameter + 4.r) &&
-        resolvedSize.height > (collapsedDiameter + 4.r);
+        resolvedSize.width > (collapsedDiameter + 4) &&
+        resolvedSize.height > (collapsedDiameter + 4);
+    final isLandscapePanel = resolvedSize.width > resolvedSize.height * 1.08;
+    final panelBaseSize = isLandscapePanel
+        ? const Size(420.0, 300.0)
+        : const Size(320.0, 420.0);
+    final contentScale = math.min(
+      resolvedSize.width / panelBaseSize.width,
+      resolvedSize.height / panelBaseSize.height,
+    ).clamp(isLandscapePanel ? 0.58 : 0.54, 1.0).toDouble();
+    final isCompactPanel =
+        isLandscapePanel ||
+        contentScale < 0.96 ||
+        resolvedSize.width < 340.0 ||
+        resolvedSize.height < 420.0;
+    final headerLeftPadding = (isCompactPanel ? 10.0 : 14.0) * contentScale;
+    final headerTopPadding = (isCompactPanel ? 8.0 : 12.0) * contentScale;
+    final headerRightPadding = (isCompactPanel ? 8.0 : 12.0) * contentScale;
+    final headerClosePadding = (isCompactPanel ? 3.0 : 4.0) * contentScale;
+    final headerCloseIconSize = (isCompactPanel ? 14.0 : 16.0) * contentScale;
+    final headerGap = (isCompactPanel ? 8.0 : 10.0) * contentScale;
+    final headerTitleFontSize =
+        (isCompactPanel ? 11.5 : 13.0) * contentScale;
+    final headerSubtitleFontSize =
+        (isCompactPanel ? 9.5 : 11.0) * contentScale;
+    final headerSubtitleGap = (isCompactPanel ? 1.0 : 2.0) * contentScale;
+    final contentLeftPadding = (isCompactPanel ? 8.0 : 10.0) * contentScale;
+    final contentTopPadding = (isCompactPanel ? 42.0 : 56.0) * contentScale;
+    final contentRightPadding = (isCompactPanel ? 8.0 : 12.0) * contentScale;
+    final contentBottomPadding =
+        (isCompactPanel ? 8.0 : 12.0) * contentScale;
 
     void startDragging(Offset globalPosition) {
       if (isResizing.value) {
@@ -387,14 +421,14 @@ class _AiOverlayViewport extends HookConsumerWidget {
                                   ? Colors.black
                                   : context.colorScheme.primary)
                               .withValues(alpha: showExpandedPanel ? 0.1 : 0.18),
-                      blurRadius: showExpandedPanel ? 16.r : 10.r,
-                      offset: Offset(0, showExpandedPanel ? 6.r : 4.r),
+                      blurRadius: showExpandedPanel ? 16 : 10,
+                      offset: Offset(0, showExpandedPanel ? 6 : 4),
                     ),
                     if (!showExpandedPanel)
                       BoxShadow(
                         color: context.colorScheme.primary.withValues(alpha: 0.32),
-                        blurRadius: 14.r,
-                        spreadRadius: 1.2.r,
+                        blurRadius: 14,
+                        spreadRadius: 1.2,
                       ),
                   ],
                   border: Border.all(
@@ -441,9 +475,9 @@ class _AiOverlayViewport extends HookConsumerWidget {
                               onPanCancel: stopDragging,
                               child: Padding(
                                 padding: EdgeInsets.fromLTRB(
-                                  14.r,
-                                  12.r,
-                                  12.r,
+                                  headerLeftPadding,
+                                  headerTopPadding,
+                                  headerRightPadding,
                                   0,
                                 ),
                                 child: Row(
@@ -451,10 +485,12 @@ class _AiOverlayViewport extends HookConsumerWidget {
                                     Material(
                                       color: context.colorScheme.surface
                                           .withValues(alpha: 0.28),
-                                      borderRadius: BorderRadius.circular(12.r),
+                                      borderRadius: BorderRadius.circular(
+                                        12.0 * contentScale,
+                                      ),
                                       child: InkWell(
                                         borderRadius: BorderRadius.circular(
-                                          12.r,
+                                          12.0 * contentScale,
                                         ),
                                         onTap: () {
                                           overlayStateNotifier.setExpanded(
@@ -462,17 +498,19 @@ class _AiOverlayViewport extends HookConsumerWidget {
                                           );
                                         },
                                         child: Padding(
-                                          padding: EdgeInsets.all(4.r),
+                                          padding: EdgeInsets.all(
+                                            headerClosePadding,
+                                          ),
                                           child: Icon(
                                             Icons.remove_rounded,
-                                            size: 16.r,
+                                            size: headerCloseIconSize,
                                             color: context.colorScheme.onSurface
                                                 .withValues(alpha: 0.82),
                                           ),
                                         ),
                                       ),
                                     ),
-                                    SizedBox(width: 10.r),
+                                    SizedBox(width: headerGap),
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment:
@@ -484,19 +522,20 @@ class _AiOverlayViewport extends HookConsumerWidget {
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
-                                              fontSize: 13.sp,
+                                              fontSize: headerTitleFontSize,
                                               fontWeight: FontWeight.w700,
                                               color:
                                                   context.colorScheme.onSurface,
                                             ),
                                           ),
-                                          SizedBox(height: 2.r),
+                                          SizedBox(height: headerSubtitleGap),
                                           Text(
                                             displaySubtitle,
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
-                                              fontSize: 11.sp,
+                                              fontSize:
+                                                  headerSubtitleFontSize,
                                               color: context
                                                   .colorScheme
                                                   .onSurfaceVariant,
@@ -512,40 +551,50 @@ class _AiOverlayViewport extends HookConsumerWidget {
                           ),
                           Padding(
                             padding: EdgeInsets.fromLTRB(
-                              10.r,
-                              56.r,
-                              12.r,
-                              12.r,
+                              contentLeftPadding,
+                              contentTopPadding,
+                              contentRightPadding,
+                              contentBottomPadding,
                             ),
-                            child: Column(
-                              children: [
-                                _AiOverlayInitBanner(
-                                  chatState: chatState,
-                                  onRetry: initializeOverlayChat,
-                                ),
-                                Expanded(
-                                  child: AiChatList(
-                                    messages: chatState.visibleMessages,
-                                    scrollController: scrollController,
-                                    packageName: chatScopeId,
-                                    customTitle: context.isZh
-                                        ? '内存调试助手'
-                                        : 'Memory Assistant',
-                                    customSubtitle: displaySubtitle,
+                            child: AiChatCompactScope(
+                              enabled: isCompactPanel,
+                              scale: contentScale,
+                              child: Column(
+                                children: [
+                                  _AiOverlayInitBanner(
+                                    chatState: chatState,
+                                    onRetry: initializeOverlayChat,
+                                    isCompact: isCompactPanel,
                                   ),
-                                ),
-                                AiChatInput(
-                                  packageName: chatScopeId,
-                                  showQuickActions: false,
-                                  isEmbedded: true,
-                                  onRetryInitialization: initializeOverlayChat,
-                                ),
-                              ],
+                                  Expanded(
+                                    child: AiChatList(
+                                      messages: chatState.visibleMessages,
+                                      scrollController: scrollController,
+                                      packageName: chatScopeId,
+                                      isCompact: isCompactPanel,
+                                      customTitle: context.isZh
+                                          ? '内存调试助手'
+                                          : 'Memory Assistant',
+                                      customSubtitle: displaySubtitle,
+                                    ),
+                                  ),
+                                  AiChatInput(
+                                    packageName: chatScopeId,
+                                    showQuickActions: false,
+                                    isEmbedded: true,
+                                    isCompact: isCompactPanel,
+                                    showBuiltinOptions: true,
+                                    builtinOptionsCompact: true,
+                                    onRetryInitialization:
+                                        initializeOverlayChat,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                           Positioned(
-                            right: 2.r,
-                            bottom: 2.r,
+                            right: 2,
+                            bottom: 2,
                             child: GestureDetector(
                               behavior: HitTestBehavior.translucent,
                               onPanStart: (details) {
@@ -608,10 +657,12 @@ class _AiOverlayInitBanner extends StatelessWidget {
   const _AiOverlayInitBanner({
     required this.chatState,
     required this.onRetry,
+    this.isCompact = false,
   });
 
   final AiChatRuntimeState chatState;
   final Future<void> Function() onRetry;
+  final bool isCompact;
 
   @override
   Widget build(BuildContext context) {
@@ -619,6 +670,7 @@ class _AiOverlayInitBanner extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    final contentScale = AiChatCompactScope.scaleOf(context);
     final isInitializing =
         chatState.sessionInitState == AiSessionInitState.initializing;
     final backgroundColor = isInitializing
@@ -636,11 +688,19 @@ class _AiOverlayInitBanner extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      margin: EdgeInsets.fromLTRB(6.r, 0, 6.r, 8.r),
-      padding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 10.r),
+      margin: EdgeInsets.fromLTRB(
+        (isCompact ? 4.0 : 6.0) * contentScale,
+        0,
+        (isCompact ? 4.0 : 6.0) * contentScale,
+        (isCompact ? 6.0 : 8.0) * contentScale,
+      ),
+      padding: EdgeInsets.symmetric(
+        horizontal: (isCompact ? 10.0 : 12.0) * contentScale,
+        vertical: (isCompact ? 8.0 : 10.0) * contentScale,
+      ),
       decoration: BoxDecoration(
         color: backgroundColor,
-        borderRadius: BorderRadius.circular(14.r),
+        borderRadius: BorderRadius.circular(14.0 * contentScale),
       ),
       child: Row(
         children: [
@@ -648,17 +708,17 @@ class _AiOverlayInitBanner extends StatelessWidget {
             isInitializing
                 ? Icons.hourglass_top_rounded
                 : Icons.error_outline_rounded,
-            size: 16.r,
+            size: (isCompact ? 14.0 : 16.0) * contentScale,
             color: foregroundColor,
           ),
-          SizedBox(width: 8.r),
+          SizedBox(width: (isCompact ? 6.0 : 8.0) * contentScale),
           Expanded(
             child: Text(
               message,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 11.5.sp,
+                fontSize: (isCompact ? 10.0 : 11.5) * contentScale,
                 color: foregroundColor,
               ),
             ),
