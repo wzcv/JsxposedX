@@ -1,9 +1,7 @@
-import 'package:JsxposedX/common/widgets/custom_text_field.dart';
 import 'package:JsxposedX/common/widgets/overlay_window/overlay_text_input_context_menu.dart';
 import 'package:JsxposedX/common/widgets/overlay_window/overlay_panel_dialog.dart';
 import 'package:JsxposedX/core/extensions/context_extensions.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -56,23 +54,9 @@ class MemoryToolJumpAddressDialog extends HookWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Expanded(
-                    child: CustomTextField(
+                    child: _JumpAddressField(
                       controller: addressController,
-                      keyboardType: TextInputType.visiblePassword,
-                      labelText: context.l10n.memoryToolJumpAddressFieldLabel,
-                      contextMenuBuilder: buildOverlayTextInputContextMenu,
-                      fillColor: context.colorScheme.surfaceContainerHighest
-                          .withValues(alpha: 0.22),
-                      focusedBorderColor: context.colorScheme.primary,
-                      enabledBorderColor: context.colorScheme.outlineVariant
-                          .withValues(alpha: 0.34),
-                      inputFormatters: <TextInputFormatter>[
-                        FilteringTextInputFormatter.allow(
-                          isHex.value
-                              ? RegExp(r'[0-9a-fA-FxX]')
-                              : RegExp(r'\d'),
-                        ),
-                      ],
+                      isHex: isHex.value,
                     ),
                   ),
                   SizedBox(width: 10.r),
@@ -85,6 +69,18 @@ class MemoryToolJumpAddressDialog extends HookWidget {
                         onTap: isSubmitting.value
                             ? null
                             : () {
+                                final sanitizedInput = _sanitizeJumpAddressInput(
+                                  addressController.text,
+                                  isHex: !isHex.value,
+                                );
+                                if (sanitizedInput != addressController.text) {
+                                  addressController.value = TextEditingValue(
+                                    text: sanitizedInput,
+                                    selection: TextSelection.collapsed(
+                                      offset: sanitizedInput.length,
+                                    ),
+                                  );
+                                }
                                 isHex.value = !isHex.value;
                               },
                         child: Ink(
@@ -173,6 +169,77 @@ class MemoryToolJumpAddressDialog extends HookWidget {
       },
     );
   }
+}
+
+class _JumpAddressField extends StatelessWidget {
+  const _JumpAddressField({
+    required this.controller,
+    required this.isHex,
+  });
+
+  final TextEditingController controller;
+  final bool isHex;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      keyboardType: isHex
+          ? TextInputType.visiblePassword
+          : const TextInputType.numberWithOptions(),
+      enableInteractiveSelection: true,
+      contextMenuBuilder: buildOverlayTextInputContextMenu,
+      style: context.textTheme.titleSmall?.copyWith(
+        fontWeight: FontWeight.w700,
+      ),
+      decoration: InputDecoration(
+        hintText: context.l10n.memoryToolJumpAddressFieldLabel,
+        filled: true,
+        fillColor: context.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.42,
+        ),
+        enabledBorder: _inputBorder(context),
+        focusedBorder: _inputBorder(
+          context,
+          color: context.colorScheme.primary.withValues(alpha: 0.9),
+          width: 1.4,
+        ),
+        border: _inputBorder(context),
+        contentPadding: EdgeInsets.symmetric(horizontal: 12.r, vertical: 14.r),
+      ),
+    );
+  }
+}
+
+OutlineInputBorder _inputBorder(
+  BuildContext context, {
+  Color? color,
+  double width = 1,
+}) {
+  return OutlineInputBorder(
+    borderRadius: BorderRadius.circular(14.r),
+    borderSide: BorderSide(
+      color: color ?? context.colorScheme.outlineVariant.withValues(alpha: 0.7),
+      width: width,
+    ),
+  );
+}
+
+String _sanitizeJumpAddressInput(String input, {required bool isHex}) {
+  final trimmed = input.trim();
+  if (trimmed.isEmpty) {
+    return '';
+  }
+
+  if (isHex) {
+    final normalized = trimmed.startsWith(RegExp(r'0x', caseSensitive: false))
+        ? trimmed.substring(0, 2) +
+              trimmed.substring(2).replaceAll(RegExp(r'[^0-9a-fA-F]'), '')
+        : trimmed.replaceAll(RegExp(r'[^0-9a-fA-F]'), '');
+    return normalized;
+  }
+
+  return trimmed.replaceAll(RegExp(r'[^0-9]'), '');
 }
 
 int? _tryParseJumpAddress(String input, {required bool isHex}) {
