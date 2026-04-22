@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:JsxposedX/common/pages/toast.dart';
 import 'package:JsxposedX/core/extensions/context_extensions.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/models/memory_tool_entry_kind.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/models/memory_tool_saved_item.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/pages/tabs/debug_tabs/memory_tool_debug_breakpoints_tab.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/pages/tabs/debug_tabs/memory_tool_debug_detail_tab.dart';
@@ -15,6 +16,7 @@ import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/me
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_pointer_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_tool_saved_items_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/utils/memory_tool_debug_presenter.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/utils/memory_tool_export_util.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/utils/memory_tool_search_result_presenter.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_debug_instruction_editor_dialog.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/widgets/memory_tool_debug_primitives.dart';
@@ -103,7 +105,7 @@ class MemoryToolDebugTab extends HookConsumerWidget {
     final allHits = hitsAsync.asData?.value ?? const <MemoryBreakpointHit>[];
     final savedInstructionItems = <int, MemoryToolSavedItem>{
       for (final item in savedItems)
-        if (item.isInstructionPatch) item.address: item,
+        if (item.isInstruction) item.address: item,
     };
 
     useEffect(() {
@@ -360,15 +362,75 @@ class MemoryToolDebugTab extends HookConsumerWidget {
       if (selectedBreakpoint == null || selectedValueInfo == null) {
         return;
       }
-      savedItemsNotifier.saveOne(
+      savedItemsNotifier.saveEntry(
         pid: pid,
         result: selectedValueInfo.result,
         preview: selectedValueInfo.preview,
         isFrozen: false,
+        entryKind: MemoryToolEntryKind.value,
       );
       await ToastOverlayMessage.show(
         context.l10n.memoryToolSavedToSavedMessage(1),
         duration: const Duration(milliseconds: 1200),
+      );
+    }
+
+    Future<void> exportCurrentDebugContext() async {
+      final breakpoint = selectedBreakpoint;
+      if (breakpoint == null) {
+        return;
+      }
+      final valueInfo = selectedValueInfo;
+      final hit = selectedHit;
+      final writerGroup = selectedWriterGroup;
+      await exportMemoryToolItemsToLocal(
+        context: context,
+        ref: ref,
+        sourceKey: 'debug',
+        pid: pid,
+        items: <MemoryToolExportItem>[
+          MemoryToolExportItem(
+            pid: pid,
+            address: breakpoint.address,
+            regionStart: valueInfo?.result.regionStart,
+            regionTypeKey: valueInfo?.result.regionTypeKey,
+            valueType: breakpoint.type,
+            displayValue: valueInfo?.displayValue,
+            rawBytes: valueInfo?.rawBytes,
+            extra: <String, Object?>{
+              'breakpoint_id': breakpoint.id,
+              'length': breakpoint.length,
+              'access_type': formatMemoryToolDebugAccessType(
+                context.l10n,
+                breakpoint.accessType,
+              ),
+              'enabled': breakpoint.enabled,
+              'pause_process_on_hit': breakpoint.pauseProcessOnHit,
+              'hit_count': breakpoint.hitCount,
+              'selected_writer_pc': writerGroup == null
+                  ? null
+                  : formatMemoryToolSearchResultAddress(writerGroup.pc),
+              'selected_writer_instruction': writerGroup?.instructionText,
+              'selected_writer_transition': writerGroup?.topTransition?.summary,
+              'selected_hit_thread_id': hit?.threadId,
+              'selected_hit_timestamp': hit == null
+                  ? null
+                  : formatMemoryToolDebugTimestamp(hit.timestampMillis),
+              'selected_hit_pc': hit == null
+                  ? null
+                  : formatMemoryToolSearchResultAddress(hit.pc),
+              'selected_hit_change': selectedHitChangeInfo?.displayText,
+            },
+          ),
+        ],
+        meta: <String, Object?>{
+          'is_process_paused': state?.isProcessPaused,
+          'active_breakpoint_count': state?.activeBreakpointCount,
+          'pending_hit_count': state?.pendingHitCount,
+          'architecture': state?.architecture,
+          'selected_breakpoint_hit_count': hits.length,
+          'writer_group_count': writerGroups.length,
+        },
       );
     }
 
@@ -633,11 +695,11 @@ class MemoryToolDebugTab extends HookConsumerWidget {
                   displayValue: trimmedCurrent,
                 );
               }
-              savedItemsNotifier.saveOne(
+              savedItemsNotifier.saveEntry(
                 pid: pid,
                 result: savedResult,
                 isFrozen: false,
-                isInstructionPatch: true,
+                entryKind: MemoryToolEntryKind.instruction,
                 instructionText: trimmedCurrent,
               );
               activeDetailActions.value = null;
@@ -1121,6 +1183,14 @@ class MemoryToolDebugTab extends HookConsumerWidget {
                                       memoryBreakpointActionProvider.notifier,
                                     )
                                     .clearMemoryBreakpointHits(pid: pid);
+                              },
+                      ),
+                      MemoryToolResultSelectionActionData(
+                        icon: Icons.file_download_outlined,
+                        onTap: selectedBreakpoint == null
+                            ? null
+                            : () async {
+                                await exportCurrentDebugContext();
                               },
                       ),
                     ],

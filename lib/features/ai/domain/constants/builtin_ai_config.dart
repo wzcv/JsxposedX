@@ -65,7 +65,7 @@ const List<BuiltinAiConfigSpec> builtinAiConfigSpecs = [
     apiType: AiApiType.openai,
     apiKeyStorageKey: 'ai_builtin_api_key',
     statusLabel: 'GPT-MAX',
-    badgeLabels: ['Codex', 'GPT5.4MAX'],
+    badgeLabels: ['Evil','Claude','ChatGPT','国产'],
     purchaseUrl: 'https://shop.zmfaka.cn/shop/SQGJ7S7P',
     supportsPadiOptions: true,
   ),

@@ -68,6 +68,8 @@ class MemoryToolPointerTab extends HookConsumerWidget {
         !pointerState.isAutoChasing &&
         currentLayer != null &&
         (currentLayer.isLoadingInitial || currentLayer.isLoadingMore);
+    final shouldShowPointerTaskMask =
+        !pointerState.isAutoChasing && isRunningTask;
     final shouldPollTaskState =
         isRunningTask || pointerState.isAutoChasing || isManualScanLoading;
 
@@ -78,9 +80,29 @@ class MemoryToolPointerTab extends HookConsumerWidget {
 
       final timer = Timer.periodic(const Duration(milliseconds: 500), (_) {
         ref.invalidate(getPointerScanTaskStateProvider);
+        ref.invalidate(getPointerScanSessionStateProvider);
       });
       return timer.cancel;
     }, [shouldPollTaskState, ref]);
+
+    useEffect(() {
+      sessionStateAsync.whenData((sessionState) {
+        if (pointerState.isAutoChasing || !sessionState.hasActiveSession) {
+          return;
+        }
+        pointerController.ensureSessionLayerVisible(
+          sessionState: sessionState,
+          isLoadingInitial: isRunningTask,
+        );
+      });
+      return null;
+    }, [
+      sessionStateAsync,
+      pointerState.isAutoChasing,
+      pointerState.layers.length,
+      isRunningTask,
+      pointerController,
+    ]);
 
     useEffect(() {
       taskStateAsync.whenData((taskState) {
@@ -314,7 +336,7 @@ class MemoryToolPointerTab extends HookConsumerWidget {
               onCancel: pointerController.cancelAutoChase,
             ),
           ),
-        if (!pointerState.isAutoChasing && isManualScanLoading)
+        if (shouldShowPointerTaskMask)
           Positioned.fill(
             child: _MemoryToolPointerTaskMask(
               taskState: currentTaskState,

@@ -98,7 +98,7 @@ final class CurrentBrowseResultLivePreviewsProvider
 }
 
 String _$currentBrowseResultLivePreviewsHash() =>
-    r'ab3a80bc084e8a94adf538f7474e6137d7e93164';
+    r'3eb1e887a43d243e18f301394678065600374b2c';
 
 @ProviderFor(MemoryToolBrowseController)
 const memoryToolBrowseControllerProvider =
@@ -135,7 +135,7 @@ final class MemoryToolBrowseControllerProvider
 }
 
 String _$memoryToolBrowseControllerHash() =>
-    r'465d3cd0096af74bd500588c40aac003c6671e27';
+    r'9fcff0d026d9f3600153c52034c037ad62208f46';
 
 abstract class _$MemoryToolBrowseController
     extends $Notifier<MemoryToolBrowseState> {

@@ -225,7 +225,7 @@ final class MemoryToolResultSelectionProvider
 }
 
 String _$memoryToolResultSelectionHash() =>
-    r'cf47c9d5901fb067b82a4dfe6ca9182abe98edb2';
+    r'29b6662008cccf0af1900546c47cfa37edbb6d9f';
 
 abstract class _$MemoryToolResultSelection
     extends $Notifier<MemoryToolResultSelectionState> {

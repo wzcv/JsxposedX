@@ -26,82 +26,66 @@ class MemoryToolBreakpointConfigDialog extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initialLength = _resolveInitialLength(result, preview);
-    final selectedLength = useState<int>(initialLength);
+    final selectedLength = useState<int>(
+      _resolveInitialLength(result, preview),
+    );
     final accessType = useState<MemoryBreakpointAccessType>(
       MemoryBreakpointAccessType.write,
     );
-    final pauseOnHit = useState<bool>(true);
+    final pauseOnHit = useState<bool>(false);
     final isSubmitting = useState<bool>(false);
     final candidateLengths = _resolveSupportedLengths(
       preview?.rawBytes ?? result.rawBytes,
     );
 
     return OverlayPanelDialog.card(
-      onClose: () {
-        if (isSubmitting.value) {
-          return;
-        }
-        onClose();
-      },
-      maxWidthPortrait: 388.r,
-      maxWidthLandscape: 560.r,
-      maxHeightPortrait: 460.r,
-      maxHeightLandscape: 360.r,
+      onClose: isSubmitting.value ? null : onClose,
+      maxWidthPortrait: 320.r,
+      maxWidthLandscape: 400.r,
+      maxHeightPortrait: 400.r,
+      maxHeightLandscape: 340.r,
       cardBorderRadius: 18.r,
+      fillCardHeight: true,
       childBuilder: (context, viewport, layout) {
         return Padding(
           padding: EdgeInsets.all(14.r),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                _SectionCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        context.isZh ? '断点调试' : 'Breakpoint Debug',
-                        style: context.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      context.isZh ? '创建断点' : 'Create Breakpoint',
+                      style: context.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
                       ),
-                      SizedBox(height: 6.r),
-                      Text(
-                        '${context.isZh ? '地址' : 'Address'}: 0x${formatMemoryToolSearchResultAddress(result.address)}',
-                        style: context.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(height: 4.r),
-                      Text(
-                        '${context.isZh ? '当前值' : 'Current Value'}: ${preview?.displayValue ?? result.displayValue}',
-                        style: context.textTheme.bodySmall,
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-                SizedBox(height: 12.r),
-                _SectionCard(
+                  if (isSubmitting.value)
+                    SizedBox(
+                      width: 16.r,
+                      height: 16.r,
+                      child: CircularProgressIndicator(strokeWidth: 2.r),
+                    ),
+                ],
+              ),
+              SizedBox(height: 12.r),
+              Expanded(
+                child: SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Text(
-                        context.isZh ? '监控方式' : 'Access Type',
-                        style: context.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      SizedBox(height: 10.r),
+                      _Label(text: context.isZh ? '类型' : 'Access'),
+                      SizedBox(height: 8.r),
                       Wrap(
                         spacing: 8.r,
                         runSpacing: 8.r,
                         children: MemoryBreakpointAccessType.values
                             .map(
                               (type) => ChoiceChip(
-                                selected: accessType.value == type,
                                 label: Text(_mapAccessTypeLabel(context, type)),
+                                selected: accessType.value == type,
                                 onSelected: isSubmitting.value
                                     ? null
                                     : (_) {
@@ -111,108 +95,84 @@ class MemoryToolBreakpointConfigDialog extends HookWidget {
                             )
                             .toList(growable: false),
                       ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 12.r),
-                _SectionCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        context.isZh ? '监控长度' : 'Watch Length',
-                        style: context.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      SizedBox(height: 4.r),
-                      Text(
-                        context.isZh
-                            ? 'CPU 硬件断点监控的是从当前地址开始的一段字节范围，支持 1 / 2 / 4 / 8 字节。'
-                            : 'Hardware watchpoints monitor a byte range from the current address. Supported sizes: 1 / 2 / 4 / 8 bytes.',
-                        style: context.textTheme.bodySmall?.copyWith(
-                          color: context.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      SizedBox(height: 10.r),
+                      SizedBox(height: 12.r),
+                      _Label(text: context.isZh ? '长度' : 'Length'),
+                      SizedBox(height: 8.r),
                       Wrap(
                         spacing: 8.r,
                         runSpacing: 8.r,
-                        children: candidateLengths
-                            .map(
-                              (length) => ChoiceChip(
-                                selected: selectedLength.value == length,
-                                label: Text('$length B'),
-                                onSelected: isSubmitting.value
-                                    ? null
-                                    : (_) {
-                                        selectedLength.value = length;
-                                      },
-                              ),
-                            )
-                            .toList(growable: false),
+                        children: <Widget>[
+                          for (final length in candidateLengths)
+                            ChoiceChip(
+                              label: Text('$length B'),
+                              selected: selectedLength.value == length,
+                              onSelected: isSubmitting.value
+                                  ? null
+                                  : (_) {
+                                      selectedLength.value = length;
+                                    },
+                            ),
+                        ],
+                      ),
+                      SizedBox(height: 12.r),
+                      SwitchListTile.adaptive(
+                        value: pauseOnHit.value,
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          context.isZh ? '命中后暂停程序' : 'Pause on hit',
+                          style: context.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        onChanged: isSubmitting.value
+                            ? null
+                            : (value) {
+                                pauseOnHit.value = value;
+                              },
                       ),
                     ],
                   ),
                 ),
-                SizedBox(height: 12.r),
-                _SectionCard(
-                  child: SwitchListTile.adaptive(
-                    value: pauseOnHit.value,
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(context.isZh ? '命中后暂停进程' : 'Pause Process On Hit'),
-                    subtitle: Text(
-                      context.isZh
-                          ? '命中后先停住，方便看是谁写了它。'
-                          : 'Pause immediately on hit so you can inspect the writer.',
+              ),
+              SizedBox(height: 12.r),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: isSubmitting.value ? null : onClose,
+                      child: Text(context.isZh ? '取消' : 'Cancel'),
                     ),
-                    onChanged: isSubmitting.value
-                        ? null
-                        : (value) {
-                            pauseOnHit.value = value;
-                          },
                   ),
-                ),
-                SizedBox(height: 12.r),
-                Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: isSubmitting.value ? null : onClose,
-                        child: Text(context.isZh ? '取消' : 'Cancel'),
-                      ),
+                  SizedBox(width: 10.r),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: isSubmitting.value
+                          ? null
+                          : () async {
+                              isSubmitting.value = true;
+                              try {
+                                await onConfirm(
+                                  AddMemoryBreakpointRequest(
+                                    pid: pid,
+                                    address: result.address,
+                                    type: result.type,
+                                    length: selectedLength.value,
+                                    accessType: accessType.value,
+                                    enabled: true,
+                                    pauseProcessOnHit: pauseOnHit.value,
+                                  ),
+                                );
+                              } finally {
+                                isSubmitting.value = false;
+                              }
+                            },
+                      child: Text(context.isZh ? '创建' : 'Create'),
                     ),
-                    SizedBox(width: 10.r),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: isSubmitting.value
-                            ? null
-                            : () async {
-                                isSubmitting.value = true;
-                                try {
-                                  await onConfirm(
-                                    AddMemoryBreakpointRequest(
-                                      pid: pid,
-                                      address: result.address,
-                                      type: result.type,
-                                      length: selectedLength.value,
-                                      accessType: accessType.value,
-                                      enabled: true,
-                                      pauseProcessOnHit: pauseOnHit.value,
-                                    ),
-                                  );
-                                } finally {
-                                  isSubmitting.value = false;
-                                }
-                              },
-                        child: Text(context.isZh ? '创建断点' : 'Create Breakpoint'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
+            ],
           ),
         );
       },
@@ -261,29 +221,23 @@ class MemoryToolBreakpointConfigDialog extends HookWidget {
     return switch (type) {
       MemoryBreakpointAccessType.read => context.isZh ? '读' : 'Read',
       MemoryBreakpointAccessType.write => context.isZh ? '写' : 'Write',
-      MemoryBreakpointAccessType.readWrite => context.isZh ? '读写' : 'Read/Write',
+      MemoryBreakpointAccessType.readWrite =>
+        context.isZh ? '读写' : 'Read/Write',
     };
   }
 }
 
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.child});
+class _Label extends StatelessWidget {
+  const _Label({required this.text});
 
-  final Widget child;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: context.colorScheme.surfaceContainerHighest.withValues(alpha: 0.32),
-        borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(
-          color: context.colorScheme.outlineVariant.withValues(alpha: 0.42),
-        ),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(12.r),
-        child: child,
+    return Text(
+      text,
+      style: context.textTheme.labelLarge?.copyWith(
+        fontWeight: FontWeight.w900,
       ),
     );
   }

@@ -1,9 +1,11 @@
 import 'dart:typed_data';
 
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/models/memory_tool_display_item.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/models/memory_tool_entry_kind.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/providers/memory_query_provider.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/states/memory_tool_browse_state.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/states/memory_tool_result_selection_state.dart';
+import 'package:JsxposedX/features/memory_tool_overlay/presentation/utils/memory_tool_selection_limit_feedback.dart';
 import 'package:JsxposedX/features/memory_tool_overlay/presentation/utils/memory_tool_search_result_presenter.dart';
 import 'package:JsxposedX/features/overlay_window/presentation/providers/overlay_window_host_runtime_provider.dart';
 import 'package:JsxposedX/generated/memory_tool.g.dart';
@@ -51,21 +53,24 @@ Future<Map<int, MemoryValuePreview>> currentBrowseResultLivePreviews(
     return const <int, MemoryValuePreview>{};
   }
 
+  final valueResults = visibleResults
+      .where((result) => !result.isInstruction)
+      .toList(growable: false);
+  if (valueResults.isEmpty) {
+    return const <int, MemoryValuePreview>{};
+  }
+
   final previews = await ref
       .watch(memoryQueryRepositoryProvider)
       .readMemoryValues(
-        requests: visibleResults
+        requests: valueResults
             .map(
               (result) => MemoryReadRequest(
                 pid: selectedProcess.pid,
                 address: result.address,
-                type: result.isInstruction
-                    ? SearchValueType.bytes
-                    : result.type,
+                type: result.type,
                 length: resolveMemoryToolReadLengthForType(
-                  type: result.isInstruction
-                      ? SearchValueType.bytes
-                      : result.type,
+                  type: result.type,
                   bytesLength: result.rawBytes.isEmpty
                       ? 1
                       : result.rawBytes.length,
@@ -203,6 +208,32 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
     );
   }
 
+  Future<void> previewValueFromSearchResult({
+    required SearchResult result,
+    MemoryValuePreview? preview,
+    required String displayValue,
+  }) async {
+    await previewFromSearchResult(
+      result: result,
+      preview: preview,
+      displayValue: displayValue,
+      preferInstructionMode: false,
+    );
+  }
+
+  Future<void> previewInstructionFromSearchResult({
+    required SearchResult result,
+    MemoryValuePreview? preview,
+    required String displayValue,
+  }) async {
+    await previewFromSearchResult(
+      result: result,
+      preview: preview,
+      displayValue: displayValue,
+      preferInstructionMode: true,
+    );
+  }
+
   Future<void> previewFromAddress({
     required SearchResult sourceResult,
     MemoryValuePreview? sourcePreview,
@@ -215,11 +246,7 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
       return;
     }
 
-    final shouldUseInstructionMode =
-        preferInstructionMode ||
-        isMemoryToolInstructionDisplayValue(
-          anchorDisplayValue ?? sourceResult.displayValue,
-        );
+    final shouldUseInstructionMode = preferInstructionMode;
     final sourceRawBytes = _resolveAnchorRawBytes(
       preview: sourcePreview,
       result: sourceResult,
@@ -264,7 +291,7 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
         type: SearchValueType.bytes,
         rawBytes: instructionPreview.rawBytes,
         displayValue: instructionPreview.instructionText,
-        kind: MemoryToolDisplayItemKind.instruction,
+        entryKind: MemoryToolEntryKind.instruction,
         instructionText: instructionPreview.instructionText,
       );
     } else {
@@ -398,6 +425,36 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
     );
   }
 
+  Future<void> previewValueFromAddress({
+    required SearchResult sourceResult,
+    MemoryValuePreview? sourcePreview,
+    required int targetAddress,
+    String? anchorDisplayValue,
+  }) async {
+    await previewFromAddress(
+      sourceResult: sourceResult,
+      sourcePreview: sourcePreview,
+      targetAddress: targetAddress,
+      anchorDisplayValue: anchorDisplayValue,
+      preferInstructionMode: false,
+    );
+  }
+
+  Future<void> previewInstructionFromAddress({
+    required SearchResult sourceResult,
+    MemoryValuePreview? sourcePreview,
+    required int targetAddress,
+    String? anchorDisplayValue,
+  }) async {
+    await previewFromAddress(
+      sourceResult: sourceResult,
+      sourcePreview: sourcePreview,
+      targetAddress: targetAddress,
+      anchorDisplayValue: anchorDisplayValue,
+      preferInstructionMode: true,
+    );
+  }
+
   Future<void> recenter() async {
     final anchorItem = state.anchorItem;
     final selectedProcess = ref.read(memoryToolSelectedProcessProvider);
@@ -462,10 +519,19 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
         readableRegions: state.regions,
         addresses: collected.addresses.reversed.toList(growable: false),
       );
+      final nextResults = _mergeBrowseResults(loadedResults, state.results);
+      final paginationState = _resolveBrowsePaginationState(
+        anchorAddress: anchorItem.address,
+        strideBytes: state.strideBytes,
+        regions: state.regions,
+        loadedResults: nextResults,
+      );
       state = state.copyWith(
-        results: _mergeBrowseResults(loadedResults, state.results),
-        topNextStep: collected.nextStep,
-        reachedTopBoundary: collected.reachedBoundary,
+        results: nextResults,
+        topNextStep: paginationState.topNextStep,
+        bottomNextStep: paginationState.bottomNextStep,
+        reachedTopBoundary: paginationState.reachedTopBoundary,
+        reachedBottomBoundary: paginationState.reachedBottomBoundary,
         isLoadingAbove: false,
       );
     } catch (error) {
@@ -504,10 +570,19 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
         readableRegions: state.regions,
         addresses: collected.addresses,
       );
+      final nextResults = _mergeBrowseResults(state.results, loadedResults);
+      final paginationState = _resolveBrowsePaginationState(
+        anchorAddress: anchorItem.address,
+        strideBytes: state.strideBytes,
+        regions: state.regions,
+        loadedResults: nextResults,
+      );
       state = state.copyWith(
-        results: _mergeBrowseResults(state.results, loadedResults),
-        bottomNextStep: collected.nextStep,
-        reachedBottomBoundary: collected.reachedBoundary,
+        results: nextResults,
+        topNextStep: paginationState.topNextStep,
+        bottomNextStep: paginationState.bottomNextStep,
+        reachedTopBoundary: paginationState.reachedTopBoundary,
+        reachedBottomBoundary: paginationState.reachedBottomBoundary,
         isLoadingBelow: false,
       );
     } catch (error) {
@@ -541,6 +616,11 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
         ..add(address);
     } else if (selected.length < state.selectionState.selectionLimit) {
       selected.add(address);
+    } else {
+      showMemoryToolSelectionLimitToast(
+        ref,
+        state.selectionState.selectionLimit,
+      );
     }
 
     state = state.copyWith(
@@ -551,6 +631,12 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
   }
 
   void selectVisible(List<MemoryToolDisplayItem> results) {
+    if (results.length > state.selectionState.selectionLimit) {
+      showMemoryToolSelectionLimitToast(
+        ref,
+        state.selectionState.selectionLimit,
+      );
+    }
     state = state.copyWith(
       selectionState: state.selectionState.copyWith(
         selectedAddresses: results
@@ -568,12 +654,22 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
         .toList(growable: false);
     final selectedVisible = state.selectionState.selectedAddresses.toSet();
     final nextSelected = <int>[...preserved];
+    var reachedSelectionLimit = false;
     for (final result in results) {
-      if (selectedVisible.contains(result.address) ||
-          nextSelected.length >= state.selectionState.selectionLimit) {
+      if (selectedVisible.contains(result.address)) {
         continue;
       }
+      if (nextSelected.length >= state.selectionState.selectionLimit) {
+        reachedSelectionLimit = true;
+        break;
+      }
       nextSelected.add(result.address);
+    }
+    if (reachedSelectionLimit) {
+      showMemoryToolSelectionLimitToast(
+        ref,
+        state.selectionState.selectionLimit,
+      );
     }
 
     state = state.copyWith(
@@ -593,6 +689,20 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
     state = state.copyWith(
       selectionState: state.selectionState.copyWith(
         selectedAddresses: const <int>[],
+      ),
+    );
+  }
+
+  void removeSelectionAddress(int address) {
+    if (!state.selectionState.selectedAddresses.contains(address)) {
+      return;
+    }
+
+    state = state.copyWith(
+      selectionState: state.selectionState.copyWith(
+        selectedAddresses: state.selectionState.selectedAddresses
+            .where((selectedAddress) => selectedAddress != address)
+            .toList(growable: false),
       ),
     );
   }
@@ -773,7 +883,7 @@ class MemoryToolBrowseController extends _$MemoryToolBrowseController {
             type: anchorItem.type,
             rawBytes: instruction.rawBytes,
             displayValue: instruction.instructionText,
-            kind: MemoryToolDisplayItemKind.instruction,
+            entryKind: MemoryToolEntryKind.instruction,
             instructionText: instruction.instructionText,
           ),
         );
