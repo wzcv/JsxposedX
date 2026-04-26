@@ -151,6 +151,45 @@ class AppLocalizationsEn extends AppLocalizations {
   String get about => 'About';
 
   @override
+  String get disclaimer => 'Disclaimer';
+
+  @override
+  String get disclaimerSubtitle =>
+      'Legal use, AI output, and responsibility terms';
+
+  @override
+  String get disclaimerDialogIntro =>
+      'The following content is extracted from the project README. Continued use of this project means you have read and agreed to this statement.';
+
+  @override
+  String get disclaimerLegalTitle => 'Legal Use';
+
+  @override
+  String get disclaimerLegalBody =>
+      'This project is an open source technical research tool and may only be used for lawful purposes such as software debugging, program analysis, memory mechanism learning, development testing, and authorized environment research. It is published to promote technical exchange and learning, and does not target any specific game, platform, software, or online service. It provides no support for cheating, bypassing protections, or illegal use guidance.';
+
+  @override
+  String get disclaimerProhibitedTitle => 'Prohibited Use';
+
+  @override
+  String get disclaimerProhibitedBody =>
+      'Do not use this project for online game cheating, plug-in creation, automated violations, interference with servers or clients, unauthorized modification of third-party program data, undermining fair competition, or any purpose that violates laws, regulations, or platform rules.';
+
+  @override
+  String get disclaimerResponsibilityTitle => 'Responsibility';
+
+  @override
+  String get disclaimerResponsibilityBody =>
+      'Users must ensure their use complies with local laws, regulations, and relevant service terms. Any direct or indirect consequences arising from use, distribution, or secondary development of this project are borne by the user and are unrelated to the author.';
+
+  @override
+  String get disclaimerAiTitle => 'AI Feature Notice';
+
+  @override
+  String get disclaimerAiBody =>
+      'The built-in AI features are only general assistance modules for data analysis, content explanation, result filtering, information organization, operation guidance, learning, and research. AI output may contain errors, omissions, or may not apply to specific scenarios. It is for reference only, and users must make their own judgments and bear final responsibility.';
+
+  @override
   String get community => 'Community';
 
   @override
