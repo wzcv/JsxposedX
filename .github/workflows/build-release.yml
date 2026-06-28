@@ -62,6 +62,29 @@ jobs:
         with:
           submodules: recursive
 
+      # --- 新增：在 Linux 环境下安全剥离阿里云 Maven 镜像 ---
+      - name: Disable Aliyun maven mirrors (CI workspace only)
+        run: |
+          # 定义需要检查的文件
+          FILES="android/build.gradle.kts android/settings.gradle.kts"
+          
+          for file in $FILES; do
+            if [ -f "$file" ]; then
+              # 使用 perl 移除包含 aliyun 的 maven { url = uri(...) } 块
+              perl -i -0pe 's/\s*maven\s*\{\s*url\s*=\s*uri\(\s*"https:\/\/maven\.aliyun\.com\/[^"]*"\s*\)\s*\}//gms' "$file"
+              echo "Stripped aliyun mirrors from $file"
+            fi
+          done
+          
+          # 检查是否还有残留的 aliyun 引用
+          if grep -rn "aliyun" $FILES; then
+            echo "::error::Aliyun references still present after strip!"
+            exit 1
+          fi
+          
+          echo "OK - no aliyun references remain."
+      # -----------------------------------------------------
+
       - name: Setup Java 17
         uses: actions/setup-java@v5
         with:
