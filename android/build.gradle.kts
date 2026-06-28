@@ -1,5 +1,6 @@
 allprojects {
     repositories {
+        google()
         // 国内镜像优先，官方仓库兜底，减少 Maven Central / Google Maven 慢下载
         maven {
             url = uri("https://maven.aliyun.com/repository/google")
@@ -10,7 +11,6 @@ allprojects {
         maven {
             url = uri("https://maven.aliyun.com/repository/public")
         }
-        google()
         mavenCentral()
     }
 }
