@@ -26,6 +26,10 @@ concurrency:
 permissions:
   contents: write
 
+env:
+  # Keep release builds on the Flutter version validated by build.yml.
+  FLUTTER_VERSION: '3.41.9'
+
 jobs:
   build:
     name: Build APK (${{ matrix.flavor }} - ${{ matrix.abi_name }})
@@ -92,9 +96,10 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Setup Flutter
+      - name: Setup Flutter ${{ env.FLUTTER_VERSION }}
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
 
